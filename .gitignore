@@ -1,0 +1,4 @@
+autodash/node_modules/
+autodash/.vite/
+autodash/dist/
+autodash/.env.local
