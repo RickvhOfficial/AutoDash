@@ -97,9 +97,12 @@ function AppLayout() {
 
       {/* key + location op Routes voor soepele overgang tussen pagina's */}
       <main
-        className={`flex-1 pl-0 lg:pl-[4.5rem] ${isHome ? 'pt-0' : 'pt-24'}`}
+        className={`flex min-h-0 flex-1 flex-col pl-0 lg:pl-[4.5rem] ${isHome ? 'pt-0' : 'pt-24'}`}
       >
-        <div key={location.pathname} className="page-transition-enter">
+        <div
+          key={location.pathname}
+          className="page-transition-enter flex min-h-0 flex-1 flex-col"
+        >
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/races" element={<RaceCalendar />} />
