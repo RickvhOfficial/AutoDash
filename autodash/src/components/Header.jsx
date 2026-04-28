@@ -1,4 +1,4 @@
-// -----------------------------------------------------------------------------
+﻿// -----------------------------------------------------------------------------
 // Navigatie + hamburger-icoon.
 //
 // variant "sidebar" (standaard): gebruikt in de vaste desktop-aside naast content.
@@ -28,7 +28,7 @@ const navLinks = [
   { path: '/lap-tracker', label: 'Karttijden', icon: faStopwatch },
 ]
 
-/** Animated hamburger ↔ kruis; `open=true` betekent “menu staat open” (icoon wordt X). */
+/** Animated hamburger ↔ kruis; `open=true` betekent "menu staat open" (icoon wordt X). */
 export function MenuToggleIcon({ open }) {
   return (
     <span className="relative block h-5 w-6">
@@ -49,11 +49,11 @@ export function MenuToggleIcon({ open }) {
 function activeLinkClasses(isActive, variant) {
   if (variant === 'overlay') {
     return isActive
-      ? 'border-red-500/90 bg-red-500/10 text-red-300 ring-1 ring-red-500/50'
+      ? 'border-red-600/95 bg-red-950/50 text-red-100 ring-1 ring-red-500/55'
       : 'border-transparent text-slate-300 active:bg-slate-800 hover:bg-slate-800 hover:text-white'
   }
   return isActive
-    ? 'border-red-500/90 bg-red-500/10 text-red-300 shadow-[0_0_12px_rgba(239,68,68,0.35)] ring-1 ring-red-500/40'
+    ? 'border-red-600/95 bg-red-950/50 text-red-100 shadow-[0_0_18px_rgba(220,38,38,0.42)] ring-1 ring-red-500/45'
     : 'border-transparent text-slate-300 hover:bg-slate-800 hover:text-white'
 }
 
@@ -65,7 +65,7 @@ export default function Header({ menuOpen, setMenuOpen, variant = 'sidebar' }) {
     return (
       <header className="flex max-h-[100dvh] min-h-[100dvh] flex-col bg-slate-900 text-slate-100">
         {/* Zelfde visuele bandhoogte als de vaste LogoBanner/hamburger-regel op mobiel */}
-        <div className="flex h-20 shrink-0 items-center justify-end border-b border-slate-700 px-4">
+        <div className="flex h-24 shrink-0 items-center justify-end border-b border-slate-800 px-4">
           <button
             type="button"
             onClick={() => setMenuOpen((prev) => !prev)}
@@ -110,7 +110,7 @@ export default function Header({ menuOpen, setMenuOpen, variant = 'sidebar' }) {
 
   return (
     <header className="flex flex-1 flex-col bg-slate-900 text-slate-100">
-      <div className="flex justify-end border-b border-slate-700 px-2 py-3">
+      <div className="flex justify-end border-b border-slate-800 px-2 py-3">
         <button
           type="button"
           onClick={() => setMenuOpen((prev) => !prev)}
