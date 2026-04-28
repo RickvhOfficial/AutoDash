@@ -1,11 +1,8 @@
-// -----------------------------------------------------------------------------
-// Hoofdapplicatie-shell: Router, layout en gedeelde navigatie-state (menuOpen).
+﻿// -----------------------------------------------------------------------------
+// Hoofdapplicatie-shell: Router, layout en gedeelde navigatiestate (menuOpen).
 //
-// Responsive gedrag:
-// - Vanaf breakpoint `lg` (1024px): vaste linker sidebar zoals ingesteld onder de LogoBanner.
-// - Kleiner dan `lg`: sidebar verborgen; zwevend vierkant hamburger-icoon rechtsboven opent fullscreen-overlay.
-//
-// Route-wissels: lichte animatie via `.page-transition-enter` (key op wrapper rond Routes).
+// Logo-banner: h-24, op "/" transparant over de hero; andere routes vaste balk.
+// Desktop-sidebar: fixed links vanaf top-24 (onder logo).
 // -----------------------------------------------------------------------------
 import { useEffect, useState } from 'react'
 import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom'
@@ -56,13 +53,15 @@ function AppLayout() {
     return () => window.removeEventListener('keydown', onEscape)
   }, [menuOpen])
 
+  const isHome = location.pathname === '/'
+
   return (
     <div className="flex min-h-screen flex-col bg-slate-950 text-slate-100">
-      <LogoBanner />
+      <LogoBanner heroOverlay={isHome} />
 
       {/* Desktop: zichtbaar vanaf lg */}
       <aside
-        className={`hidden lg:flex fixed left-0 top-20 z-50 h-[calc(100vh-5rem)] flex-col overflow-hidden border-r border-slate-700 bg-slate-900 transition-all duration-500 ease-in-out ${
+        className={`hidden lg:flex fixed left-0 top-24 z-50 h-[calc(100vh-6rem)] flex-col overflow-hidden border-r border-slate-800 bg-slate-900 transition-all duration-500 ease-in-out ${
           menuOpen ? 'w-64' : 'w-[4.157rem]'
         }`}
       >
@@ -73,7 +72,7 @@ function AppLayout() {
       {!menuOpen && (
         <button
           type="button"
-          className="fixed right-3 top-4 z-[70] inline-flex h-12 w-12 items-center justify-center rounded-lg border border-slate-700 bg-slate-900/95 text-slate-200 shadow-lg backdrop-blur-sm transition hover:bg-slate-800 lg:hidden"
+          className="fixed right-3 top-6 z-[70] inline-flex h-12 w-12 items-center justify-center rounded-lg border border-slate-800 bg-slate-900/95 text-slate-200 shadow-lg backdrop-blur-sm transition hover:bg-slate-800 lg:hidden"
           onClick={() => setMenuOpen(true)}
           aria-label="Menu openen"
         >
@@ -97,7 +96,9 @@ function AppLayout() {
       )}
 
       {/* key + location op Routes voor soepele overgang tussen pagina's */}
-      <main className="flex-1 pt-20 pl-0 lg:pl-[4.5rem]">
+      <main
+        className={`flex-1 pl-0 lg:pl-[4.5rem] ${isHome ? 'pt-0' : 'pt-24'}`}
+      >
         <div key={location.pathname} className="page-transition-enter">
           <Routes>
             <Route path="/" element={<Home />} />
