@@ -18,7 +18,7 @@ export default function Footer() {
             href={GITHUB_REPO}
             target="_blank"
             rel="noopener noreferrer"
-            className="ml-1 font-medium text-red-500 underline-offset-2 transition hover:text-red-400 hover:underline"
+            className="ml-1 font-medium text-red-500 underline-offset-2 transition hover:text-red-400"
           >
             GitHub
           </a>

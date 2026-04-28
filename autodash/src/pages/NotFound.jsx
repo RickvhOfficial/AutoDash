@@ -25,7 +25,7 @@ export default function NotFound() {
             Oh! Oh! Pagina niet gevonden. Klik{' '}
             <Link
               to="/"
-              className="font-semibold text-slate-100 underline decoration-2 underline-offset-[0.35em] transition hover:text-white"
+              className="font-bold text-red-500 underline underline-offset-2 transition hover:text-red-400"
             >
               Hier
             </Link>{' '}
