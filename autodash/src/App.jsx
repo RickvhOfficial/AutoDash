@@ -57,7 +57,7 @@ function AppLayout() {
   }, [menuOpen])
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
+    <div className="flex min-h-screen flex-col bg-slate-950 text-slate-100">
       <LogoBanner />
 
       {/* Desktop: zichtbaar vanaf lg */}
@@ -97,7 +97,7 @@ function AppLayout() {
       )}
 
       {/* key + location op Routes voor soepele overgang tussen pagina's */}
-      <main className="pt-20 pl-0 lg:pl-[4.5rem]">
+      <main className="flex-1 pt-20 pl-0 lg:pl-[4.5rem]">
         <div key={location.pathname} className="page-transition-enter">
           <Routes>
             <Route path="/" element={<Home />} />
