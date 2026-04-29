@@ -1,15 +1,17 @@
 ﻿// -----------------------------------------------------------------------------
 // Hoofdapplicatie-shell: Router, layout en gedeelde navigatiestate (menuOpen).
 //
-// Logo-banner: h-24, op "/" transparant over de hero; andere routes vaste balk.
-// Desktop-sidebar: fixed links vanaf top-24 (onder logo).
+// Desktop-sidebar: zwevende kolom; `top` = `--sidebar-mid-y` (gemeten t.o.v. footer in viewport).
+// Mobiel: LogoBanner + overlay-menu.
+
+const LOGO_BOTTOM_PX = 96
 // -----------------------------------------------------------------------------
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom'
 import Header, { MenuToggleIcon } from './components/Header'
 import LogoBanner from './components/LogoBanner'
 import Footer from './components/Footer'
-import Home from './pages/Home'
+import Home, { HomeHero, HOME_HERO_HEIGHT_PX } from './pages/Home'
 import RaceCalendar from './pages/RaceCalendar'
 import DriverStandings from './pages/DriverStandings'
 import CircuitWeather from './pages/CircuitWeather'
@@ -22,6 +24,10 @@ function AppLayout() {
 
   // true = sidebar uitgeklapt (desktop) of mobiel menu zichtbaar
   const [menuOpen, setMenuOpen] = useState(false)
+  // Desktop: pas na width-transitie narrow-layout (gecentreerde iconen); tijdens animatie links voor soepelere beweging
+  const [sidebarWidthAnimDone, setSidebarWidthAnimDone] = useState(true)
+  const prevMenuOpenRef = useRef(menuOpen)
+  const sidebarAnimFallbackRef = useRef(null)
 
   // Scroll-lock alleen op smalle viewports als het mobiele menu open is (achtergrond scrollt niet mee)
   useEffect(() => {
@@ -55,17 +61,99 @@ function AppLayout() {
 
   const isHome = location.pathname === '/'
 
+  const footerRef = useRef(null)
+
+  useLayoutEffect(() => {
+    const isHomeRoute = location.pathname === '/'
+    function updateSidebarMid() {
+      if (!window.matchMedia('(min-width: 1024px)').matches) {
+        document.documentElement.style.removeProperty('--sidebar-mid-y')
+        return
+      }
+      const footerEl = footerRef.current
+      const vh = window.innerHeight
+      // Op home loopt de hero 250px over de bovenkant; sidebar verticaal centreren tussen hero-onderkant en footer, niet tussen logo en footer (anders overlapte de hero).
+      const bandTop = isHomeRoute ? HOME_HERO_HEIGHT_PX : LOGO_BOTTOM_PX
+      let bandBottom = vh
+      if (footerEl) {
+        const ft = footerEl.getBoundingClientRect().top
+        bandBottom = Math.min(Math.max(ft, bandTop + 80), vh)
+      }
+      const span = bandBottom - bandTop
+      const midY = bandTop + Math.max(span / 2, 48)
+      document.documentElement.style.setProperty('--sidebar-mid-y', `${midY}px`)
+    }
+
+    updateSidebarMid()
+    const footerEl = footerRef.current
+    const ro =
+      footerEl && typeof ResizeObserver !== 'undefined'
+        ? new ResizeObserver(updateSidebarMid)
+        : null
+    if (footerEl && ro) ro.observe(footerEl)
+    window.addEventListener('resize', updateSidebarMid)
+    window.addEventListener('scroll', updateSidebarMid, { passive: true })
+
+    return () => {
+      if (footerEl && ro) ro.unobserve(footerEl)
+      ro?.disconnect()
+      window.removeEventListener('resize', updateSidebarMid)
+      window.removeEventListener('scroll', updateSidebarMid)
+      document.documentElement.style.removeProperty('--sidebar-mid-y')
+    }
+  }, [location.pathname])
+
+  useLayoutEffect(() => {
+    if (prevMenuOpenRef.current === menuOpen) return
+    prevMenuOpenRef.current = menuOpen
+    setSidebarWidthAnimDone(false)
+    if (sidebarAnimFallbackRef.current) {
+      clearTimeout(sidebarAnimFallbackRef.current)
+      sidebarAnimFallbackRef.current = null
+    }
+    sidebarAnimFallbackRef.current = setTimeout(() => {
+      setSidebarWidthAnimDone(true)
+      sidebarAnimFallbackRef.current = null
+    }, 600)
+    return () => {
+      if (sidebarAnimFallbackRef.current) {
+        clearTimeout(sidebarAnimFallbackRef.current)
+        sidebarAnimFallbackRef.current = null
+      }
+    }
+  }, [menuOpen])
+
+  function handleDesktopAsideTransitionEnd(e) {
+    if (e.target !== e.currentTarget) return
+    if (e.propertyName !== 'width') return
+    if (sidebarAnimFallbackRef.current) {
+      clearTimeout(sidebarAnimFallbackRef.current)
+      sidebarAnimFallbackRef.current = null
+    }
+    setSidebarWidthAnimDone(true)
+  }
+
   return (
-    <div className="flex min-h-screen flex-col bg-slate-950 text-slate-100">
+    <div className="flex min-h-screen flex-col overflow-x-hidden bg-slate-950 text-slate-100">
       <LogoBanner heroOverlay={isHome} />
 
-      {/* Desktop: zichtbaar vanaf lg */}
+      {isHome && <HomeHero />}
+
+      {/* Desktop: compacte staaf, verticaal gecentreerd in het venster onder de logo-balk */}
       <aside
-        className={`hidden lg:flex fixed left-0 top-24 z-50 h-[calc(100vh-6rem)] flex-col overflow-hidden border-r border-slate-800 bg-slate-900 transition-all duration-500 ease-in-out ${
-          menuOpen ? 'w-64' : 'w-[4.157rem]'
+        style={{
+          top: 'var(--sidebar-mid-y, calc(6rem + (100dvh - 6rem) / 2))',
+        }}
+        onTransitionEnd={handleDesktopAsideTransitionEnd}
+        className={`fixed left-0 z-50 hidden max-h-[min(calc(100dvh-7rem),52rem)] -translate-y-1/2 flex-col overflow-hidden rounded-r-2xl border border-slate-800 bg-slate-900 shadow-xl transition-[width] duration-500 ease-in-out lg:flex ${
+          menuOpen ? 'w-64' : 'w-[4.5rem]'
         }`}
       >
-        <Header menuOpen={menuOpen} setMenuOpen={setMenuOpen} />
+        <Header
+          menuOpen={menuOpen}
+          setMenuOpen={setMenuOpen}
+          desktopSidebarCollapseSettled={sidebarWidthAnimDone}
+        />
       </aside>
 
       {/* Mobiel: compact vierkant rechtsboven in de hoek, niet half scherm */}
@@ -95,9 +183,11 @@ function AppLayout() {
         </div>
       )}
 
-      {/* key + location op Routes voor soepele overgang tussen pagina's */}
+      {/* lg: inspring = smalle sidebar (4.5rem) + kleine lucht; aside left-0 */}
       <main
-        className={`flex min-h-0 flex-1 flex-col pl-0 lg:pl-[4.5rem] ${isHome ? 'pt-0' : 'pt-24'}`}
+        className={`flex min-h-0 flex-1 flex-col pl-0 lg:pl-[5rem] ${
+          isHome ? 'pt-0' : 'pt-24'
+        }`}
       >
         <div
           key={location.pathname}
@@ -115,7 +205,7 @@ function AppLayout() {
         </div>
       </main>
 
-      <Footer />
+      <Footer ref={footerRef} />
     </div>
   )
 }

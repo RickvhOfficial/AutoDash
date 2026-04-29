@@ -3,6 +3,23 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Rode custom scrollbar — geen achtergrond op het spoor, rood blokje zonder rand. */
+.scrollbar-red {
+  scrollbar-color: #dc2626 transparent;
+  scrollbar-width: thin;
+}
+.scrollbar-red::-webkit-scrollbar {
+  width: 5px;
+}
+.scrollbar-red::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-red::-webkit-scrollbar-thumb {
+  background-color: #dc2626;
+  border-radius: 3px;
+  border: none;
+}
+
 body {
   margin: 0;
 }

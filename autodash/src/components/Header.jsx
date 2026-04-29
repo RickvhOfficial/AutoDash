@@ -28,6 +28,9 @@ const navLinks = [
   { path: '/lap-tracker', label: 'Karttijden', icon: faStopwatch },
 ]
 
+// Vaste nav-rij (desktop sidebar + overlay): 54×54 px cel (hoogte = breedte).
+const NAV_ROW_H_PX = 54
+
 /** Animated hamburger ↔ kruis; `open=true` betekent "menu staat open" (icoon wordt X). */
 export function MenuToggleIcon({ open }) {
   return (
@@ -57,7 +60,12 @@ function activeLinkClasses(isActive, variant) {
     : 'border-transparent text-slate-300 hover:bg-slate-800 hover:text-white'
 }
 
-export default function Header({ menuOpen, setMenuOpen, variant = 'sidebar' }) {
+export default function Header({
+  menuOpen,
+  setMenuOpen,
+  variant = 'sidebar',
+  desktopSidebarCollapseSettled = true,
+}) {
   const location = useLocation()
   const isOverlay = variant === 'overlay'
 
@@ -78,8 +86,7 @@ export default function Header({ menuOpen, setMenuOpen, variant = 'sidebar' }) {
         </div>
 
         {/*
-          smalle,max brede kolom + vaste eerst kolom voor iconen ⇒ verticaal rechte icoon-lijn.
-          Elke Link is een 2-koloms grid (icoon | label); w-full binnen max-w houdt rijen gelijk breed.
+          Zelfde rijhoogte als desktop (NAV_ROW_H_PX): 54px.
         */}
         <nav className="flex min-h-0 flex-1 flex-col portrait:justify-center landscape:justify-start overflow-y-auto px-4 py-6">
           <ul className="mx-auto flex w-full max-w-[15rem] flex-col gap-2 sm:max-w-[17rem]">
@@ -90,9 +97,10 @@ export default function Header({ menuOpen, setMenuOpen, variant = 'sidebar' }) {
                   <Link
                     to={link.path}
                     onClick={() => setMenuOpen(false)}
-                    className={`grid w-full grid-cols-[2.25rem_minmax(0,1fr)] items-center gap-3 rounded-lg border px-3 py-2 text-left transition-[colors,box-shadow] duration-200 ease-out ${activeLinkClasses(isActive, 'overlay')}`}
+                    className={`grid w-full grid-cols-[2.25rem_minmax(0,1fr)] items-center gap-3 rounded-lg border px-3 text-left transition-[colors,box-shadow] duration-200 ease-out ${activeLinkClasses(isActive, 'overlay')}`}
+                    style={{ minHeight: NAV_ROW_H_PX, height: NAV_ROW_H_PX }}
                   >
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center justify-self-start rounded-md bg-slate-700 text-xs text-slate-200">
+                    <span className="flex size-9 shrink-0 items-center justify-center justify-self-start rounded-md bg-slate-700 text-xs text-slate-200">
                       <FontAwesomeIcon icon={link.icon ?? faGaugeHigh} className="h-4 w-4" />
                     </span>
                     <span className="min-w-0 text-xs font-medium sm:text-sm">
@@ -108,43 +116,74 @@ export default function Header({ menuOpen, setMenuOpen, variant = 'sidebar' }) {
     )
   }
 
-  return (
-    <header className="flex flex-1 flex-col bg-slate-900 text-slate-100">
-      <div className="flex justify-end border-b border-slate-800 px-2 py-3">
-        <button
-          type="button"
-          onClick={() => setMenuOpen((prev) => !prev)}
-          className="inline-flex h-12 w-12 items-center justify-center rounded-lg border border-transparent text-slate-200 transition hover:bg-slate-800"
-          aria-label={menuOpen ? 'Menu sluiten' : 'Menu openen'}
-          aria-expanded={menuOpen}
-        >
-          <MenuToggleIcon open={menuOpen} />
-        </button>
-      </div>
+  // h-[54px] bewust gelijk aan NAV_ROW_H_PX (Tailwind JIT vangt geen template-class).
+  const sidebarRowClass = 'h-[54px]'
 
-      {/* overflow-hidden: tekst knipt mee als de aside smaller wordt (geen losse width-animatie op labels) */}
-      <nav className="flex-1 overflow-hidden px-2 py-3">
-        <ul className="space-y-2">
-          {navLinks.map((link) => {
-            const isActive = location.pathname === link.path
-            return (
-              <li key={link.path}>
-                <Link
-                  to={link.path}
-                  className={`group flex h-[3.094rem] w-full min-w-0 items-center gap-2 rounded-lg border px-2 transition-[colors,box-shadow] duration-200 ease-out ${activeLinkClasses(isActive, 'sidebar')}`}
-                >
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-slate-700 text-sm text-slate-200">
-                    <FontAwesomeIcon icon={link.icon ?? faGaugeHigh} />
-                  </span>
-                  <span className="min-w-0 flex-1 overflow-hidden whitespace-nowrap text-left text-sm font-medium">
-                    {link.label}
-                  </span>
-                </Link>
-              </li>
-            )
-          })}
-        </ul>
-      </nav>
+  // Labels blijven zichtbaar tot width-transitie klaar is; daarna sr-only smalle staaf
+  const showNavLabels = menuOpen || !desktopSidebarCollapseSettled
+
+  return (
+    <header className="flex w-full flex-col bg-slate-900 text-slate-100">
+      <div className="flex min-w-0 flex-col overflow-hidden px-2 pb-6 pt-5">
+        <div
+          className={`flex ${sidebarRowClass} shrink-0 items-center border-b border-slate-800/90 ${
+            menuOpen
+              ? 'justify-end px-0'
+              : 'justify-end px-2 pr-3'
+          }`}
+        >
+          <button
+            type="button"
+            onClick={() => setMenuOpen((prev) => !prev)}
+            className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-transparent text-slate-200 transition hover:bg-slate-800"
+            aria-label={menuOpen ? 'Menu sluiten' : 'Menu openen'}
+            aria-expanded={menuOpen}
+          >
+            <MenuToggleIcon open={menuOpen} />
+          </button>
+        </div>
+
+        <nav className="mt-3 max-h-[min(26rem,calc(100dvh-16rem))] overflow-x-hidden overflow-y-auto px-0 pb-1 pt-1">
+          <ul className="space-y-2">
+            {navLinks.map((link) => {
+              const isActive = location.pathname === link.path
+              const narrowRowLayout =
+                !menuOpen && desktopSidebarCollapseSettled
+                  ? 'justify-center px-2'
+                  : 'justify-start gap-2 px-2'
+              return (
+                <li key={link.path}>
+                  <Link
+                    to={link.path}
+                    title={
+                      !menuOpen && desktopSidebarCollapseSettled
+                        ? link.label
+                        : undefined
+                    }
+                    className={`group flex ${sidebarRowClass} w-full min-w-0 items-center overflow-hidden rounded-lg border transition-[colors,box-shadow] duration-200 ease-out ${narrowRowLayout} ${activeLinkClasses(isActive, 'sidebar')}`}
+                  >
+                    <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-slate-700 text-sm text-slate-200">
+                      <FontAwesomeIcon
+                        icon={link.icon ?? faGaugeHigh}
+                        className="h-4 w-4"
+                      />
+                    </span>
+                    <span
+                      className={
+                        showNavLabels
+                          ? 'min-w-0 flex-1 overflow-hidden text-ellipsis text-left text-sm font-medium whitespace-nowrap'
+                          : 'sr-only'
+                      }
+                    >
+                      {link.label}
+                    </span>
+                  </Link>
+                </li>
+              )
+            })}
+          </ul>
+        </nav>
+      </div>
     </header>
   )
 }
