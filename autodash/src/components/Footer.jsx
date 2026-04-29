@@ -18,17 +18,17 @@ const Footer = forwardRef(function Footer(_props, ref) {
           alt="AutoDash logo"
           className="mx-auto block h-auto max-h-16 w-auto max-w-[min(100%,12rem)] shrink-0 object-contain object-center pb-3 md:pb-4"
         />
-        <p className="shrink-0 text-sm italic text-slate-400 md:text-base">
+        <p className="shrink-0 text-sm italic text-slate-500 md:text-base">
           Driven by Code. Addicted to Speed.
         </p>
-        <p className="mt-2 shrink-0 text-sm text-slate-300 md:text-base">
+        <p className="mt-2 shrink-0 text-sm text-slate-400 md:text-base">
           Gemaakt door RickvhOfficial{' '}
-          <span className="text-slate-500">|</span>{' '}
+          <span className="text-slate-600">|</span>{' '}
           <a
             href={GITHUB_REPO}
             target="_blank"
             rel="noopener noreferrer"
-            className="ml-1 font-medium text-red-500 underline-offset-2 transition hover:text-red-400"
+            className="ml-1 font-medium text-[#d50000] underline-offset-2 transition-colors duration-200 hover:text-red-400"
           >
             GitHub
           </a>
