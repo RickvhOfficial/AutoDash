@@ -160,7 +160,7 @@ function AppLayout() {
       {!menuOpen && (
         <button
           type="button"
-          className="fixed right-3 top-6 z-[70] inline-flex h-12 w-12 items-center justify-center rounded-lg border border-slate-800 bg-slate-900/95 text-slate-200 shadow-lg backdrop-blur-sm transition hover:bg-slate-800 lg:hidden"
+          className="fixed right-3 top-2 z-[70] inline-flex h-11 w-11 items-center justify-center rounded-lg border border-slate-800 bg-slate-900/95 text-slate-200 shadow-lg backdrop-blur-sm transition hover:bg-slate-800 sm:top-3 lg:hidden"
           onClick={() => setMenuOpen(true)}
           aria-label="Menu openen"
         >

@@ -26,12 +26,12 @@ export function HomeHero() {
         <div className="absolute inset-x-0 top-24 bottom-0 z-10 flex flex-col justify-center lg:pl-[5rem]">
           <div className="mx-auto w-full max-w-6xl px-6 py-2 md:px-10">
             <div className="inline-block max-w-full">
-              <h1 className="text-3xl font-extrabold tracking-tight text-white [text-shadow:0_3px_10px_rgba(0,0,0,0.9)] md:text-5xl">
+              <h1 className="text-3xl font-extrabold tracking-tight text-white [text-shadow:0_5px_18px_rgba(0,0,0,0.95)] md:text-5xl lg:text-6xl">
                 Welkom bij{' '}
-                <span className="text-[#d50000] italic [text-shadow:0_2px_6px_rgba(0,0,0,0.8)]">Auto</span>
+                <span className="text-[#d50000] italic [text-shadow:0_4px_12px_rgba(0,0,0,0.88)]">Auto</span>
                 <span className="text-white italic">Dash</span>
               </h1>
-              <p className="mt-2 max-w-xl text-base font-medium leading-relaxed text-white [text-shadow:0_1px_6px_rgba(0,0,0,0.9)] md:text-lg">
+              <p className="mt-2 max-w-xl text-base font-medium leading-relaxed text-white [text-shadow:0_3px_10px_rgba(0,0,0,0.92)] md:text-xl">
                 Jouw dashboard voor races, tijden en weer op het circuit.
               </p>
             </div>
@@ -42,31 +42,33 @@ export function HomeHero() {
   )
 }
 
-// ── Statische nationaliteitsmap 2025 F1-rijders ────────────────────────────
-// OpenF1 levert country_code=null voor alle 2025-rijders.
+// ── Statische nationaliteitsmap 2026 F1-rijders ────────────────────────────
+// OpenF1 levert country_code=null voor alle rijders; bevestigd via session 11253 (Suzuka 2026).
 // ISO 3166-1 alpha-2 (kleine letters) voor flagcdn.com.
 const DRIVER_NATIONALITIES = {
-  1:  'nl', // Max Verstappen
+  1:  'nl', // Max Verstappen / kampioenschapsnummer (huidige seizoen-data)
+  3:  'nl', // Max Verstappen    (Red Bull)
   4:  'gb', // Lando Norris
-  5:  'br', // Gabriel Bortoleto
-  6:  'fr', // Isack Hadjar
-  7:  'au', // Jack Doohan
-  10: 'fr', // Pierre Gasly
-  12: 'it', // Kimi Antonelli
-  14: 'es', // Fernando Alonso
-  16: 'mc', // Charles Leclerc
-  18: 'ca', // Lance Stroll
-  22: 'jp', // Yuki Tsunoda
-  23: 'th', // Alexander Albon
-  27: 'de', // Nico Hülkenberg
-  30: 'nz', // Liam Lawson
-  31: 'fr', // Esteban Ocon
-  43: 'ar', // Franco Colapinto
-  44: 'gb', // Lewis Hamilton
-  55: 'es', // Carlos Sainz
-  63: 'gb', // George Russell
-  81: 'au', // Oscar Piastri
-  87: 'gb', // Oliver Bearman
+  5:  'br', // Gabriel Bortoleto (Audi)
+  6:  'fr', // Isack Hadjar      (Red Bull)
+  10: 'fr', // Pierre Gasly      (Alpine)
+  11: 'mx', // Sergio Perez      (Cadillac)
+  12: 'it', // Kimi Antonelli    (Mercedes)
+  14: 'es', // Fernando Alonso   (Aston Martin)
+  16: 'mc', // Charles Leclerc   (Ferrari)
+  18: 'ca', // Lance Stroll      (Aston Martin)
+  23: 'th', // Alexander Albon   (Williams)
+  27: 'de', // Nico Hülkenberg   (Audi)
+  30: 'nz', // Liam Lawson       (Racing Bulls)
+  31: 'fr', // Esteban Ocon      (Haas)
+  41: 'gb', // Arvid Lindblad    (Racing Bulls)
+  43: 'ar', // Franco Colapinto  (Alpine)
+  44: 'gb', // Lewis Hamilton    (Ferrari)
+  55: 'es', // Carlos Sainz      (Williams)
+  63: 'gb', // George Russell    (Mercedes)
+  77: 'fi', // Valtteri Bottas   (Cadillac)
+  81: 'au', // Oscar Piastri     (McLaren)
+  87: 'gb', // Oliver Bearman    (Haas)
 }
 
 function driverFlag(driverNumber) {
@@ -104,8 +106,11 @@ const CIRCUIT_COORDS = {
 }
 
 // ── localStorage-cache helpers ────────────────────────────────────────────
-const CACHE_KEY = 'autodash_cache_v1'
+const CACHE_KEY = 'autodash_cache_v2'
 const CACHE_MAX_AGE_MS = 60 * 60 * 1000 // 60 minuten
+const UNSPLASH_BG_CACHE_KEY = 'autodash_unsplash_bg_v1'
+const UNSPLASH_BG_TTL_MS = 60 * 60 * 1000 // 60 minuten
+const UNSPLASH_UTM = 'utm_source=autodash&utm_medium=referral'
 
 function readCache() {
   try {
@@ -131,25 +136,67 @@ function writeCache(partial) {
   }
 }
 
+function readUnsplashCache() {
+  try {
+    const raw = localStorage.getItem(UNSPLASH_BG_CACHE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    if (!parsed.savedAt || Date.now() - parsed.savedAt > UNSPLASH_BG_TTL_MS) return null
+    if (!Array.isArray(parsed.photos) || parsed.photos.length !== 5) return null
+    return parsed.photos
+  } catch {
+    return null
+  }
+}
+
+function writeUnsplashCache(photos) {
+  try {
+    localStorage.setItem(
+      UNSPLASH_BG_CACHE_KEY,
+      JSON.stringify({ photos, savedAt: Date.now() })
+    )
+  } catch {
+    // localStorage vol of niet beschikbaar
+  }
+}
+
 // ── Component ─────────────────────────────────────────────────────────────
 export default function Home() {
+  const cached = readCache()
+  const currentSeasonYear = new Date().getFullYear()
+  const canUseLegacySeasonStatsCache =
+    !cached?.seasonStatsYear &&
+    Array.isArray(cached?.seasonStats) &&
+    cached.seasonStats.length > 0 &&
+    Number(cached?.nextRace?.year) === currentSeasonYear
+  const buildWidgetState = (data, emptyValue, updatedAt) => {
+    const normalizedData = data ?? emptyValue
+    const hasData = Array.isArray(normalizedData)
+      ? normalizedData.length > 0
+      : Boolean(normalizedData)
+    return {
+      loading: !hasData,
+      error: '',
+      data: normalizedData,
+      stale: false,
+      lastUpdated: hasData ? updatedAt || null : null,
+    }
+  }
   // State initialiseren vanuit cache zodat data direct zichtbaar is na page refresh
-  const [nextRace, setNextRace] = useState(() => {
-    const c = readCache()
-    return c?.nextRace ? { loading: false, error: '', data: c.nextRace } : { loading: true, error: '', data: null }
-  })
-  const [weather, setWeather] = useState(() => {
-    const c = readCache()
-    return c?.weather ? { loading: false, error: '', data: c.weather } : { loading: true, error: '', data: null }
-  })
-  const [drivers, setDrivers] = useState(() => {
-    const c = readCache()
-    return c?.drivers ? { loading: false, error: '', data: c.drivers } : { loading: true, error: '', data: [] }
-  })
-  const [seasonStats, setSeasonStats] = useState(() => {
-    const c = readCache()
-    return c?.seasonStats ? { loading: false, error: '', data: c.seasonStats } : { loading: true, error: '', data: [] }
-  })
+  const [nextRace, setNextRace] = useState(() => buildWidgetState(cached?.nextRace, null, cached?.nextRaceUpdatedAt))
+  const [weather, setWeather] = useState(() => buildWidgetState(cached?.weather, null, cached?.weatherUpdatedAt))
+  const [drivers, setDrivers] = useState(() => buildWidgetState(cached?.drivers, [], cached?.driversUpdatedAt))
+  const [seasonStats, setSeasonStats] = useState(() =>
+    buildWidgetState(
+      cached?.seasonStatsYear === currentSeasonYear || canUseLegacySeasonStatsCache
+        ? cached?.seasonStats
+        : [],
+      [],
+      cached?.seasonStatsYear === currentSeasonYear || canUseLegacySeasonStatsCache
+        ? cached?.seasonStatsUpdatedAt
+        : null
+    )
+  )
   const [myLaps] = useState(() => {
     const raw = localStorage.getItem('lapTimes')
     if (!raw) return []
@@ -160,26 +207,65 @@ export default function Home() {
       return []
     }
   })
-  const [bgImages, setBgImages] = useState([])
+  const [bgPhotos, setBgPhotos] = useState([])
   // Toon initial spinner alleen als er geen cache is
-  const [initialLoading, setInitialLoading] = useState(() => !readCache())
+  const [initialLoading, setInitialLoading] = useState(() => !cached)
   const [refreshing, setRefreshing] = useState(false)
 
-  const didLoadOnceRef = useRef(!!readCache())
+  const didLoadOnceRef = useRef(!!cached)
   const requestRunningRef = useRef(false)
+  const refreshDelayRef = useRef(30000)
+  const refreshFailureStreakRef = useRef(0)
+  const latestRaceDataRef = useRef(cached?.nextRace ?? null)
+  const latestCompletedRaceSessionKeyRef = useRef(null)
+  const lastOpenF1FetchAtRef = useRef(
+    Math.max(
+      Number(cached?.nextRaceUpdatedAt || 0),
+      Number(cached?.driversUpdatedAt || 0),
+      Number(cached?.seasonStatsUpdatedAt || 0)
+    )
+  )
+
+  const WEATHER_POLL_MS = 30000
+  const OPENF1_POLL_MS = 180000
 
   const openF1Base   = import.meta.env.VITE_OPENF1_URL     || 'https://api.openf1.org/v1'
   const openMeteoUrl = import.meta.env.VITE_OPEN_METEO_URL || 'https://api.open-meteo.com/v1/forecast'
   const unsplashApiUrl    = import.meta.env.VITE_UNSPLASH_API_URL || 'https://api.unsplash.com'
   const unsplashAccessKey = import.meta.env.VITE_UNSPLASH_ACCESS_KEY
 
-  const fallbackImages = useMemo(
+  const fallbackPhotos = useMemo(
     () => [
-      'https://images.unsplash.com/photo-1504707748692-419802cf939d?auto=format&fit=crop&w=1280&q=80',
-      'https://images.unsplash.com/photo-1541773367336-d14ddf89ed10?auto=format&fit=crop&w=1280&q=80',
-      'https://images.unsplash.com/photo-1552673597-e3cd6747a996?auto=format&fit=crop&w=1280&q=80',
-      'https://images.unsplash.com/photo-1563720223185-11003d516935?auto=format&fit=crop&w=1280&q=80',
-      'https://images.unsplash.com/photo-1523301343968-6a6ebf63c672?auto=format&fit=crop&w=1280&q=80',
+      {
+        url: '/placeholders/ph1.jpg',
+        photographerName: 'F1 Unleashed',
+        profileUrl: `https://unsplash.com/@f1unleashed?${UNSPLASH_UTM}`,
+        unsplashUrl: `https://unsplash.com/photos/4oAq0VOYl9A?${UNSPLASH_UTM}`,
+      },
+      {
+        url: '/placeholders/ph2.jpg',
+        photographerName: 'Jack B',
+        profileUrl: `https://unsplash.com/@nervum?${UNSPLASH_UTM}`,
+        unsplashUrl: `https://unsplash.com/photos/EwUZ8hjWXSk?${UNSPLASH_UTM}`,
+      },
+      {
+        url: '/placeholders/ph3.jpg',
+        photographerName: 'Ank Kumar',
+        profileUrl: `https://unsplash.com/@ankkumar?${UNSPLASH_UTM}`,
+        unsplashUrl: `https://unsplash.com/photos/tGghQBM-RVo?${UNSPLASH_UTM}`,
+      },
+      {
+        url: '/placeholders/ph4.jpg',
+        photographerName: 'F1 Unleashed',
+        profileUrl: `https://unsplash.com/@f1unleashed?${UNSPLASH_UTM}`,
+        unsplashUrl: `https://unsplash.com/photos/J0PLcahCOVk?${UNSPLASH_UTM}`,
+      },
+      {
+        url: '/placeholders/ph5.jpg',
+        photographerName: 'Mr. AN',
+        profileUrl: `https://unsplash.com/@mran123?${UNSPLASH_UTM}`,
+        unsplashUrl: `https://unsplash.com/photos/IFFPJpbF4CM?${UNSPLASH_UTM}`,
+      },
     ],
     []
   )
@@ -205,6 +291,11 @@ export default function Home() {
     let refreshTimer = null
     let currentController = null
 
+    function scheduleNextPoll() {
+      if (refreshTimer) clearTimeout(refreshTimer)
+      refreshTimer = setTimeout(loadDashboardData, WEATHER_POLL_MS)
+    }
+
     async function loadDashboardData() {
       if (requestRunningRef.current) return
       requestRunningRef.current = true
@@ -213,69 +304,94 @@ export default function Home() {
       const signal = currentController.signal
       const year = new Date().getFullYear()
       const now = new Date()
-      let raceData = null
-      let latestCompletedRaceSessionKey = null
+      const nowTs = Date.now()
+      const shouldFetchOpenF1 =
+        !lastOpenF1FetchAtRef.current ||
+        nowTs - lastOpenF1FetchAtRef.current >= OPENF1_POLL_MS ||
+        !latestRaceDataRef.current
+      let raceData = latestRaceDataRef.current
+      let latestCompletedRaceSessionKey = latestCompletedRaceSessionKeyRef.current
       const cacheUpdate = {}
+      let hadApiFailure = false
 
-      setNextRace((prev) => ({ ...prev, loading: true, error: '' }))
-      setWeather((prev) => ({ ...prev, loading: true, error: '' }))
-      setDrivers((prev) => ({ ...prev, loading: true, error: '' }))
-      setSeasonStats((prev) => ({ ...prev, loading: true, error: '' }))
+      if (shouldFetchOpenF1) {
+        setNextRace((prev) => ({ ...prev, loading: !prev.data, error: '' }))
+      }
+      setWeather((prev) => ({ ...prev, loading: !prev.data, error: '' }))
+      if (shouldFetchOpenF1) {
+        setDrivers((prev) => ({ ...prev, loading: prev.data.length === 0 && !prev.error, error: '' }))
+        setSeasonStats((prev) => ({ ...prev, loading: prev.data.length === 0 && !prev.error, error: '' }))
+      }
 
-      // ── Parallelle initiële fetches ────────────────────────────────────
-      const [
-        currentYearMeetingsRes,
-        nextYearMeetingsRes,
-        currentYearRaceSessionsRes,
-        previousYearRaceSessionsRes,
-      ] = await Promise.allSettled([
-        requestJson(openF1Client, `/meetings?year=${year}`, signal),
-        requestJson(openF1Client, `/meetings?year=${year + 1}`, signal),
-        requestJson(openF1Client, `/sessions?session_name=Race&year=${year}`, signal),
-        requestJson(openF1Client, `/sessions?session_name=Race&year=${year - 1}`, signal),
-      ])
+      if (shouldFetchOpenF1) {
+        // ── OpenF1 fetch (minder vaak dan weer) ───────────────────────────
+        const [
+          currentYearMeetingsRes,
+          nextYearMeetingsRes,
+          currentYearRaceSessionsRes,
+        ] = await Promise.allSettled([
+          requestJson(openF1Client, `/meetings?year=${year}`, signal),
+          requestJson(openF1Client, `/meetings?year=${year + 1}`, signal),
+          requestJson(openF1Client, `/sessions?session_name=Race&year=${year}`, signal),
+        ])
 
-      const allMeetings = [
-        ...(currentYearMeetingsRes.status === 'fulfilled' ? currentYearMeetingsRes.value : []),
-        ...(nextYearMeetingsRes.status === 'fulfilled'    ? nextYearMeetingsRes.value    : []),
-      ]
-      const allRaceSessions = [
-        ...(currentYearRaceSessionsRes.status === 'fulfilled'  ? currentYearRaceSessionsRes.value  : []),
-        ...(previousYearRaceSessionsRes.status === 'fulfilled' ? previousYearRaceSessionsRes.value : []),
-      ]
-
-      const latestRaceSession = allRaceSessions
-        .filter((s) => s.date_end && new Date(s.date_end) <= now && !s.is_cancelled)
-        .sort((a, b) => new Date(b.date_end) - new Date(a.date_end))[0]
-      latestCompletedRaceSessionKey = latestRaceSession?.session_key || null
-
-      // ── Volgende race ──────────────────────────────────────────────────
-      try {
-        const upcomingRace =
-          allMeetings
-            .filter(
-              (m) =>
-                !m.is_cancelled &&
-                m.meeting_name.toLowerCase().includes('grand prix') &&
-                new Date(m.date_start) > now
-            )
-            .sort((a, b) => new Date(a.date_start) - new Date(b.date_start))[0] || null
-
-        if (!upcomingRace) throw new Error('Geen komende Grand Prix gevonden.')
-
-        raceData = {
-          ...upcomingRace,
-          countryName:  upcomingRace.country_name         || 'Land onbekend',
-          countryFlag:  upcomingRace.country_flag          || '',
-          circuitName:  upcomingRace.circuit_short_name    || upcomingRace.location || 'Circuit onbekend',
-          circuitImage: upcomingRace.circuit_image         || null,
+        const allMeetings = [
+          ...(currentYearMeetingsRes.status === 'fulfilled' ? currentYearMeetingsRes.value : []),
+          ...(nextYearMeetingsRes.status === 'fulfilled' ? nextYearMeetingsRes.value : []),
+        ]
+        const currentYearRaceSessions =
+          currentYearRaceSessionsRes.status === 'fulfilled' ? currentYearRaceSessionsRes.value : []
+        if (currentYearMeetingsRes.status !== 'fulfilled' && nextYearMeetingsRes.status !== 'fulfilled') {
+          hadApiFailure = true
+        }
+        if (currentYearRaceSessionsRes.status !== 'fulfilled') {
+          hadApiFailure = true
         }
 
-        setNextRace({ loading: false, error: '', data: raceData })
-        cacheUpdate.nextRace = raceData
-      } catch (error) {
-        console.error('[NextRace]', error)
-        setNextRace((prev) => ({ ...prev, loading: false, error: 'Volgende race niet beschikbaar.' }))
+        const latestCurrentYearRaceSession = currentYearRaceSessions
+          .filter((s) => s.date_end && new Date(s.date_end) <= now && !s.is_cancelled)
+          .sort((a, b) => new Date(b.date_end) - new Date(a.date_end))[0]
+
+        // Alleen actuele seizoensdata gebruiken: geen fallback naar vorig jaar.
+        latestCompletedRaceSessionKey = latestCurrentYearRaceSession?.session_key || null
+        latestCompletedRaceSessionKeyRef.current = latestCompletedRaceSessionKey
+
+        // ── Volgende race ──────────────────────────────────────────────────
+        try {
+          const upcomingRace =
+            allMeetings
+              .filter(
+                (m) =>
+                  !m.is_cancelled &&
+                  m.meeting_name.toLowerCase().includes('grand prix') &&
+                  new Date(m.date_start) > now
+              )
+              .sort((a, b) => new Date(a.date_start) - new Date(b.date_start))[0] || null
+
+          if (!upcomingRace) throw new Error('Geen komende Grand Prix gevonden.')
+
+          raceData = {
+            ...upcomingRace,
+            countryName: upcomingRace.country_name || 'Land onbekend',
+            countryFlag: upcomingRace.country_flag || '',
+            circuitName: upcomingRace.circuit_short_name || upcomingRace.location || 'Circuit onbekend',
+            circuitImage: upcomingRace.circuit_image || null,
+          }
+
+          const raceNowTs = Date.now()
+          setNextRace({ loading: false, error: '', data: raceData, stale: false, lastUpdated: raceNowTs })
+          cacheUpdate.nextRace = raceData
+          cacheUpdate.nextRaceUpdatedAt = raceNowTs
+          latestRaceDataRef.current = raceData
+        } catch (error) {
+          console.error('[NextRace]', error)
+          hadApiFailure = true
+          setNextRace((prev) =>
+            prev.data
+              ? { ...prev, loading: false, error: '', stale: true }
+              : { ...prev, loading: true, error: '', stale: false }
+          )
+        }
       }
 
       // ── Weer op circuit ────────────────────────────────────────────────
@@ -307,86 +423,125 @@ export default function Home() {
         )
 
         const weatherResult = { ...weatherData.current, raceCircuit: raceData.circuitName }
-        setWeather({ loading: false, error: '', data: weatherResult })
+        const nowTs = Date.now()
+        setWeather({ loading: false, error: '', data: weatherResult, stale: false, lastUpdated: nowTs })
         cacheUpdate.weather = weatherResult
+        cacheUpdate.weatherUpdatedAt = nowTs
       } catch (error) {
         console.error('[Weather]', error)
-        setWeather((prev) => ({ ...prev, loading: false, error: 'Circuitweer niet beschikbaar.' }))
+        hadApiFailure = true
+        setWeather((prev) =>
+          prev.data
+            ? { ...prev, loading: false, error: '', stale: true }
+            : { ...prev, loading: true, error: '', stale: false }
+        )
       }
 
-      // ── Coureurs lijst & Seizoen ranglijst ────────────────────────────
-      try {
-        const sessionKey = latestCompletedRaceSessionKey || 'latest'
+      // ── Coureurs lijst & Seizoen ranglijst (OpenF1, throttled) ─────────
+      if (shouldFetchOpenF1) {
+        try {
+          const sessionKey = latestCompletedRaceSessionKey || 'latest'
 
-        const [driversRes, standingsRes] = await Promise.allSettled([
-          requestJson(openF1Client, `/drivers?session_key=${sessionKey}`, signal),
-          latestCompletedRaceSessionKey
-            ? requestJson(openF1Client, `/championship_drivers?session_key=${latestCompletedRaceSessionKey}`, signal)
-            : Promise.reject(new Error('Geen afgeronde race-sessie voor standings.')),
-        ])
+          const [driversRes, standingsRes] = await Promise.allSettled([
+            requestJson(openF1Client, `/drivers?session_key=${sessionKey}`, signal),
+            latestCompletedRaceSessionKey
+              ? requestJson(openF1Client, `/championship_drivers?session_key=${latestCompletedRaceSessionKey}`, signal)
+              : Promise.reject(new Error('Geen afgeronde race-sessie voor standings.')),
+          ])
 
-        if (driversRes.status === 'fulfilled') {
-          const mappedDrivers = driversRes.value
-            .map((d) => ({
-              name:   `${d.first_name ?? ''} ${d.last_name ?? ''}`.trim() || d.broadcast_name || 'Onbekend',
-              number: d.driver_number ?? '-',
-              flag:   driverFlag(d.driver_number),
-            }))
-            .sort((a, b) => Number(a.number) - Number(b.number))
-          setDrivers({ loading: false, error: '', data: mappedDrivers })
-          cacheUpdate.drivers = mappedDrivers
-        } else {
-          console.error('[Drivers]', driversRes.reason)
-          setDrivers((prev) => ({ ...prev, loading: false, error: 'Coureurslijst niet beschikbaar.' }))
-        }
+          if (driversRes.status === 'fulfilled') {
+            const mappedDrivers = driversRes.value
+              .map((d) => ({
+                name: `${d.first_name ?? ''} ${d.last_name ?? ''}`.trim() || d.broadcast_name || 'Onbekend',
+                number: d.driver_number ?? '-',
+                flag: driverFlag(d.driver_number),
+              }))
+              .sort((a, b) => Number(a.number) - Number(b.number))
+            const driversNowTs = Date.now()
+            setDrivers({ loading: false, error: '', data: mappedDrivers, stale: false, lastUpdated: driversNowTs })
+            cacheUpdate.drivers = mappedDrivers
+            cacheUpdate.driversUpdatedAt = driversNowTs
+          } else {
+            console.error('[Drivers]', driversRes.reason)
+            hadApiFailure = true
+            setDrivers((prev) =>
+              prev.data.length > 0
+                ? { ...prev, loading: false, error: '', stale: true }
+                : { ...prev, loading: false, error: 'Coureurs tijdelijk niet beschikbaar.', stale: false }
+            )
+          }
 
-        if (standingsRes.status === 'fulfilled' && driversRes.status === 'fulfilled') {
-          const driverByNumber = new Map(
-            driversRes.value.map((d) => [d.driver_number, d])
-          )
-          const mappedStandings = standingsRes.value
-            .map((row) => {
-              const driver = driverByNumber.get(row.driver_number)
-              return {
-                position: row.position_current ?? row.position_start ?? null,
-                name:     driver
-                  ? `${driver.first_name ?? ''} ${driver.last_name ?? ''}`.trim() || driver.broadcast_name
-                  : `#${row.driver_number}`,
-                points:   row.points_current ?? row.points_start ?? 0,
-                flag:     driverFlag(row.driver_number),
-              }
+          if (standingsRes.status === 'fulfilled' && driversRes.status === 'fulfilled') {
+            const driverByNumber = new Map(
+              driversRes.value.map((d) => [d.driver_number, d])
+            )
+            const mappedStandings = standingsRes.value
+              .map((row) => {
+                const driver = driverByNumber.get(row.driver_number)
+                return {
+                  position: row.position_current ?? row.position_start ?? null,
+                  name: driver
+                    ? `${driver.first_name ?? ''} ${driver.last_name ?? ''}`.trim() || driver.broadcast_name
+                    : `#${row.driver_number}`,
+                  points: row.points_current ?? row.points_start ?? 0,
+                  flag: driverFlag(row.driver_number),
+                }
+              })
+              .filter((r) => r.position !== null)
+              .sort((a, b) => Number(a.position) - Number(b.position))
+
+            const standingsNowTs = Date.now()
+            setSeasonStats({
+              loading: false,
+              error: '',
+              data: mappedStandings,
+              stale: false,
+              lastUpdated: standingsNowTs,
             })
-            .filter((r) => r.position !== null)
-            .sort((a, b) => Number(a.position) - Number(b.position))
-
-          setSeasonStats({ loading: false, error: '', data: mappedStandings })
-          cacheUpdate.seasonStats = mappedStandings
-        } else {
-          console.error('[Standings]', standingsRes.reason)
-          setSeasonStats((prev) => ({ ...prev, loading: false, error: 'Seizoen ranglijst niet beschikbaar.' }))
+            cacheUpdate.seasonStats = mappedStandings
+            cacheUpdate.seasonStatsUpdatedAt = standingsNowTs
+            cacheUpdate.seasonStatsYear = year
+          } else {
+            console.error('[Standings]', standingsRes.reason)
+            hadApiFailure = true
+            setSeasonStats((prev) =>
+              prev.data.length > 0
+                ? { ...prev, loading: false, error: '', stale: true }
+                : { ...prev, loading: false, error: 'Geen actuele seizoensstand beschikbaar.', stale: false }
+            )
+          }
+        } catch (error) {
+          console.error('[Drivers/Standings]', error)
+          hadApiFailure = true
+          setSeasonStats((prev) =>
+            prev.data.length > 0
+              ? { ...prev, loading: false, error: '', stale: true }
+              : { ...prev, loading: false, error: 'Geen actuele seizoensstand beschikbaar.', stale: false }
+          )
+        } finally {
+          lastOpenF1FetchAtRef.current = Date.now()
         }
-      } catch (error) {
-        console.error('[Drivers/Standings]', error)
-        setSeasonStats((prev) => ({ ...prev, loading: false, error: 'Seizoen ranglijst niet beschikbaar.' }))
-      } finally {
-        // Cache bijwerken voor elk onderdeel dat succesvol was geladen
-        if (Object.keys(cacheUpdate).length > 0) {
-          writeCache(cacheUpdate)
-        }
-        if (!didLoadOnceRef.current) {
-          didLoadOnceRef.current = true
-          setInitialLoading(false)
-        }
-        setRefreshing(false)
-        requestRunningRef.current = false
       }
+
+      // Cache bijwerken voor elk onderdeel dat succesvol was geladen
+      if (Object.keys(cacheUpdate).length > 0) {
+        writeCache(cacheUpdate)
+      }
+      if (!didLoadOnceRef.current) {
+        didLoadOnceRef.current = true
+        setInitialLoading(false)
+      }
+      if (hadApiFailure) refreshFailureStreakRef.current += 1
+      else refreshFailureStreakRef.current = 0
+      refreshDelayRef.current = WEATHER_POLL_MS
+      setRefreshing(false)
+      requestRunningRef.current = false
+      scheduleNextPoll()
     }
 
     loadDashboardData()
-    // 30 seconden interval voor zichtbare updates tijdens testen
-    refreshTimer = setInterval(loadDashboardData, 30000)
     return () => {
-      if (refreshTimer) clearInterval(refreshTimer)
+      if (refreshTimer) clearTimeout(refreshTimer)
       if (currentController) currentController.abort()
       // Reset lock bij cleanup zodat React StrictMode remount correct werkt
       requestRunningRef.current = false
@@ -396,27 +551,53 @@ export default function Home() {
   // ── Unsplash achtergrondafbeeldingen ──────────────────────────────────────
   useEffect(() => {
     const controller = new AbortController()
+
     async function loadUnsplashImages() {
-      if (!unsplashAccessKey) {
-        setBgImages(fallbackImages)
+      const cachedPhotos = readUnsplashCache()
+      if (cachedPhotos) {
+        setBgPhotos(cachedPhotos)
         return
       }
+
+      if (!unsplashAccessKey) {
+        setBgPhotos(fallbackPhotos)
+        return
+      }
+
       try {
         const res = await fetch(
-          `${unsplashApiUrl}/photos/random?count=5&query=formula%201&orientation=landscape`,
-          { headers: { Authorization: `Client-ID ${unsplashAccessKey}` }, signal: controller.signal }
+          `${unsplashApiUrl}/photos/random?count=5&query=formula%201%20motorsport&orientation=landscape&content_filter=high`,
+          {
+            headers: { Authorization: `Client-ID ${unsplashAccessKey}` },
+            signal: controller.signal,
+          }
         )
         if (!res.ok) throw new Error('Unsplash niet beschikbaar.')
         const data = await res.json()
-        const urls = data.map((p) => p?.urls?.regular).filter(Boolean).slice(0, 5)
-        setBgImages(urls.length === 5 ? urls : fallbackImages)
+        const photos = Array.isArray(data) ? data : [data]
+        const mappedPhotos = photos
+          .map((p) => ({
+            url: p?.urls?.regular || '',
+            photographerName: p?.user?.name || 'Onbekend',
+            profileUrl: `${p?.user?.links?.html || 'https://unsplash.com'}?${UNSPLASH_UTM}`,
+            unsplashUrl: `${p?.links?.html || 'https://unsplash.com'}?${UNSPLASH_UTM}`,
+          }))
+          .filter((p) => p.url)
+          .slice(0, 5)
+        if (mappedPhotos.length === 5) {
+          setBgPhotos(mappedPhotos)
+          writeUnsplashCache(mappedPhotos)
+          return
+        }
+        setBgPhotos(fallbackPhotos)
       } catch {
-        setBgImages(fallbackImages)
+        setBgPhotos(fallbackPhotos)
       }
     }
+
     loadUnsplashImages()
     return () => controller.abort()
-  }, [fallbackImages, unsplashAccessKey, unsplashApiUrl])
+  }, [fallbackPhotos, unsplashAccessKey, unsplashApiUrl])
 
   // ── Lap summary ───────────────────────────────────────────────────────────
   const lapSummary = useMemo(() => {
@@ -442,26 +623,34 @@ export default function Home() {
 
   // ── Render helpers ────────────────────────────────────────────────────────
   const cardClass =
-    'relative overflow-hidden rounded-lg border border-slate-800 bg-slate-900/50 p-4 text-left'
+    'group relative overflow-hidden rounded-lg border border-slate-700/80 bg-slate-900/55 p-5 text-left shadow-lg shadow-black/25 transition-[transform,box-shadow,background-color,border-color] duration-300 ease-out hover:scale-[1.015] hover:border-slate-500/80 hover:bg-slate-900/70 hover:shadow-xl hover:shadow-black/45'
 
   function renderCardBackground(idx, overrideImage) {
-    const imageUrl = overrideImage || bgImages[idx] || fallbackImages[idx]
+    const imageUrl = overrideImage || bgPhotos[idx]?.url || fallbackPhotos[idx]?.url
     return (
       <>
         <img
           src={imageUrl}
           alt="Formula 1 achtergrond"
-          className="absolute inset-0 h-full w-full object-cover"
+          className="absolute inset-0 h-full w-full object-cover "
         />
         <div className="absolute inset-0 bg-gradient-to-b from-slate-950/75 via-slate-950/60 to-slate-950/80" />
       </>
     )
   }
 
+  function formatMeetingCalendarDate(isoString) {
+    if (!isoString || typeof isoString !== 'string') return null
+    const datePart = isoString.split('T')[0]
+    if (!datePart) return null
+    const utcMidnight = new Date(`${datePart}T00:00:00Z`)
+    return utcMidnight.toLocaleDateString('nl-NL', { timeZone: 'UTC' })
+  }
+
   // ── JSX ───────────────────────────────────────────────────────────────────
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-slate-950 text-slate-100">
-      <section className="flex min-h-0 flex-1 flex-col justify-center px-6 py-10 md:px-10">
+      <section className="relative flex min-h-0 flex-1 flex-col justify-center px-6 py-10 md:px-10">
         {initialLoading && (
           <div className="mx-auto w-full max-w-6xl">
             <LoadingSpinner message="Dashboard data laden..." />
@@ -469,35 +658,22 @@ export default function Home() {
         )}
         {!initialLoading && (
           <div className="mx-auto w-full max-w-6xl">
-            {/* Refresh-indicator */}
-            <div className="mb-2 flex items-center justify-end gap-2 text-xs text-slate-500">
-              {refreshing ? (
-                <>
-                  <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-red-500" />
-                  <span>Verversen...</span>
-                </>
-              ) : (
-                <>
-                  <span className="inline-block h-2 w-2 rounded-full bg-slate-600" />
-                  <span>Live</span>
-                </>
-              )}
-            </div>
-
-            <div className="grid items-center gap-4 lg:grid-cols-[2fr_1fr]">
-              <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid items-stretch gap-6 lg:grid-cols-[2fr_1fr]">
+              <div className="grid gap-6 sm:grid-cols-2">
 
                 {/* Volgende race */}
                 <Link
                   to="/races"
-                  className={`${cardClass} min-h-40 cursor-pointer transition hover:scale-[1.01]`}
+                  className={`${cardClass} min-h-44 cursor-pointer`}
                 >
                   {renderCardBackground(0, nextRace.data?.circuitImage)}
                   <div className="relative z-10">
-                    <h2 className="text-sm font-semibold">Volgende race</h2>
-                    {nextRace.loading && <p className="mt-2 text-sm text-slate-300">Laden...</p>}
-                    {!nextRace.loading && nextRace.error && (
-                      <p className="mt-2 text-sm text-rose-300">{nextRace.error}</p>
+                    <span className="mb-3 block h-0.5 w-14 rounded-full bg-red-500/70" />
+                    <h2 className="border-l-2 border-red-500/70 pl-2 text-sm font-semibold">Volgende race</h2>
+                    {nextRace.loading && !nextRace.data && (
+                      <div className="mt-6 flex min-h-[7rem] items-center justify-center">
+                        <LoadingSpinner compact message="" />
+                      </div>
                     )}
                     {nextRace.data && (
                       <div className="mt-2 space-y-1 text-sm text-slate-100">
@@ -517,7 +693,11 @@ export default function Home() {
                         </div>
                         <p className="text-slate-300">
                           {nextRace.data.date_start
-                            ? new Date(nextRace.data.date_start).toLocaleDateString('nl-NL')
+                            ? `${formatMeetingCalendarDate(nextRace.data.date_start)} t/m ${
+                                nextRace.data.date_end
+                                  ? formatMeetingCalendarDate(nextRace.data.date_end)
+                                  : formatMeetingCalendarDate(nextRace.data.date_start)
+                              }`
                             : 'Datum onbekend'}
                         </p>
                       </div>
@@ -528,14 +708,15 @@ export default function Home() {
                 {/* Weer op circuit */}
                 <Link
                   to="/weather"
-                  className={`${cardClass} min-h-40 cursor-pointer transition hover:scale-[1.01]`}
+                  className={`${cardClass} min-h-44 cursor-pointer`}
                 >
                   {renderCardBackground(1)}
                   <div className="relative z-10">
                     <h2 className="text-sm font-semibold">Weer op circuit</h2>
-                    {weather.loading && <p className="mt-2 text-sm text-slate-300">Laden...</p>}
-                    {!weather.loading && weather.error && (
-                      <p className="mt-2 text-sm text-rose-300">{weather.error}</p>
+                    {weather.loading && !weather.data && (
+                      <div className="mt-6 flex min-h-[7rem] items-center justify-center">
+                        <LoadingSpinner compact message="" />
+                      </div>
                     )}
                     {weather.data && (
                       <div className="mt-2 space-y-1 text-sm text-slate-100">
@@ -555,16 +736,17 @@ export default function Home() {
                 {/* Coureurs lijst */}
                 <Link
                   to="/standings"
-                  className={`${cardClass} min-h-40 cursor-pointer transition hover:scale-[1.01]`}
+                  className={`${cardClass} min-h-44 cursor-pointer`}
                 >
                   {renderCardBackground(2)}
                   <div className="relative z-10">
                     <h2 className="text-sm font-semibold">Coureurs lijst</h2>
-                    {drivers.loading && <p className="mt-2 text-sm text-slate-300">Laden...</p>}
-                    {!drivers.loading && drivers.error && (
-                      <p className="mt-2 text-sm text-rose-300">{drivers.error}</p>
+                    {drivers.loading && drivers.data.length === 0 && (
+                      <div className="mt-6 flex min-h-[7rem] items-center justify-center">
+                        <LoadingSpinner compact message="" />
+                      </div>
                     )}
-                    {!drivers.loading && !drivers.error && (
+                    {drivers.data.length > 0 && (
                       <ul className="scrollbar-red mt-2 max-h-40 space-y-1 overflow-y-auto text-sm">
                         {drivers.data.map((driver) => (
                           <li
@@ -586,22 +768,40 @@ export default function Home() {
                         ))}
                       </ul>
                     )}
+                    {!drivers.loading && drivers.data.length === 0 && (
+                      <p className="mt-3 text-sm text-slate-300">
+                        {drivers.error || 'Coureurs tijdelijk niet beschikbaar.'}
+                      </p>
+                    )}
                   </div>
                 </Link>
 
                 {/* Seizoen ranglijst */}
                 <Link
                   to="/standings"
-                  className={`${cardClass} min-h-40 cursor-pointer transition hover:scale-[1.01]`}
+                  className={`${cardClass} min-h-44 cursor-pointer`}
                 >
                   {renderCardBackground(3)}
                   <div className="relative z-10">
-                    <h2 className="text-sm font-semibold">Seizoen ranglijst</h2>
-                    {seasonStats.loading && <p className="mt-2 text-sm text-slate-300">Laden...</p>}
-                    {!seasonStats.loading && seasonStats.error && (
-                      <p className="mt-2 text-sm text-rose-300">{seasonStats.error}</p>
+                    <div className="flex items-center justify-between gap-2">
+                      <h2 className="text-sm font-semibold">Seizoen ranglijst</h2>
+                      {!seasonStats.loading && !seasonStats.error && seasonStats.data.length > 0 && (
+                        <p className="text-xs text-slate-400">
+                          Seizoen {nextRace.data?.year ?? new Date().getFullYear()}
+                        </p>
+                      )}
+                    </div>
+                    {seasonStats.loading && seasonStats.data.length === 0 && (
+                      <div className="mt-6 flex min-h-[7rem] items-center justify-center">
+                        <LoadingSpinner compact message="" />
+                      </div>
                     )}
-                    {!seasonStats.loading && !seasonStats.error && (
+                    {!seasonStats.loading && seasonStats.data.length === 0 && (
+                      <p className="mt-3 text-sm text-slate-300">
+                        {seasonStats.error || 'Geen actuele seizoensstand beschikbaar.'}
+                      </p>
+                    )}
+                    {seasonStats.data.length > 0 && (
                       <ul className="scrollbar-red mt-2 max-h-40 space-y-1 overflow-y-auto text-xs text-slate-100">
                         {seasonStats.data.map((entry) => (
                           <li
@@ -635,25 +835,26 @@ export default function Home() {
               {/* Mijn rondetijden */}
               <Link
                 to="/lap-tracker"
-                className={`${cardClass} min-h-[336px] cursor-pointer transition hover:scale-[1.01]`}
+                className={`${cardClass} min-h-[356px] cursor-pointer border-red-500/45 bg-slate-900/75 shadow-[0_0_0_1px_rgba(239,68,68,0.22),0_12px_30px_rgba(2,6,23,0.55)] hover:border-red-400/65 hover:shadow-[0_0_0_1px_rgba(239,68,68,0.35),0_18px_38px_rgba(2,6,23,0.68)] lg:h-full`}
               >
                 {renderCardBackground(4)}
-                <div className="relative z-10 flex h-full flex-col">
-                  <h2 className="text-base font-semibold text-white">Mijn rondetijden</h2>
+                <div className="relative z-10 flex h-full min-h-[356px] flex-col">
+                  <span className="mb-3 block h-0.5 w-20 rounded-full bg-red-500/75" />
+                  <h2 className="border-l-2 border-red-500/75 pl-2 text-base font-semibold text-white">Mijn rondetijden</h2>
                   {!lapSummary && (
                     <div className="flex flex-1 items-center justify-center">
-                      <div className="rounded-lg border border-red-400/30 bg-red-900/20 p-4 text-center">
-                        <p className="text-sm font-medium text-red-200">
+                      <div className="rounded-lg border border-red-600/95 bg-red-950/50 p-5 text-center ring-1 ring-red-500/45 shadow-[0_0_18px_rgba(220,38,38,0.35)]">
+                        <p className="text-base font-semibold text-red-100">
                           Nog geen tijden opgeslagen.
                         </p>
-                        <p className="mt-1 text-xs text-red-100/90">
+                        <p className="mt-2 text-sm leading-relaxed text-red-100/90">
                           Voeg je eerste rondes toe in de LapTracker om hier je prestaties te zien.
                         </p>
                       </div>
                     </div>
                   )}
                   {lapSummary && (
-                    <div className="mt-4 space-y-2 text-sm text-slate-100">
+                    <div className="scrollbar-red mt-4 max-h-[250px] space-y-2 overflow-y-auto pl-2 text-sm text-slate-100">
                       <p>Totaal opgeslagen rondes: {lapSummary.total}</p>
                       <p className="text-slate-300">
                         Beste tijd: {lapSummary.best.lapTime?.toFixed(3)}s ({lapSummary.best.circuit})
@@ -667,6 +868,13 @@ export default function Home() {
                 </div>
               </Link>
 
+            </div>
+          </div>
+        )}
+        {!initialLoading && refreshing && (
+          <div className="pointer-events-none absolute right-2 top-2 z-20 md:right-10 md:top-10">
+            <div className="origin-top-right scale-[0.45]">
+              <LoadingSpinner compact message="" />
             </div>
           </div>
         )}

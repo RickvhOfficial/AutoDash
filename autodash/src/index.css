@@ -7,9 +7,17 @@
 .scrollbar-red {
   scrollbar-color: #dc2626 transparent;
   scrollbar-width: thin;
+  scrollbar-gutter: stable;
+  padding-right: 6px;
 }
 .scrollbar-red::-webkit-scrollbar {
   width: 5px;
+}
+.scrollbar-red::-webkit-scrollbar-button {
+  width: 0;
+  height: 0;
+  display: none;
+  background: transparent;
 }
 .scrollbar-red::-webkit-scrollbar-track {
   background: transparent;
@@ -18,10 +26,43 @@
   background-color: #dc2626;
   border-radius: 3px;
   border: none;
+  min-height: 36px;
 }
 
 body {
   margin: 0;
+}
+
+/* Mobiel: logo-balk compacter houden zodat hij niet te dominant is. */
+@media (max-width: 1023px) {
+  .logo-banner {
+    height: 3rem;
+  }
+
+  .logo-banner-inner {
+    padding-top: 0.9rem;
+    padding-bottom: 0.125rem;
+  }
+
+  .logo-banner-image {
+    max-height: 1.9rem;
+  }
+}
+
+/* Extra compact in liggende mobiele stand. */
+@media (max-width: 1023px) and (orientation: landscape) {
+  .logo-banner {
+    height: 2.75rem;
+  }
+
+  .logo-banner-inner {
+    padding-top: 0.9rem;
+    padding-bottom: 0;
+  }
+
+  .logo-banner-image {
+    max-height: 1.7rem;
+  }
 }
 
 /* Zorgt dat de app ten minste viewport-hoog is (layout met vaste header/sidebar). */

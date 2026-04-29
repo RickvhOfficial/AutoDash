@@ -124,7 +124,7 @@ export default function Header({
 
   return (
     <header className="flex w-full flex-col bg-slate-900 text-slate-100">
-      <div className="flex min-w-0 flex-col overflow-hidden px-2 pb-6 pt-5">
+      <div className="flex min-w-0 flex-col overflow-hidden px-2 py-2.5">
         <div
           className={`flex ${sidebarRowClass} shrink-0 items-center border-b border-slate-800/90 ${
             menuOpen
