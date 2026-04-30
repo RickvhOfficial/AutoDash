@@ -13,6 +13,9 @@ dist-ssr
 *.local
 .env.local
 
+# Server auto-generated cache
+server/cache.json
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

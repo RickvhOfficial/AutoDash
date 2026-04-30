@@ -1,0 +1,464 @@
+import 'dotenv/config'
+import express from 'express'
+import cors from 'cors'
+import { readFileSync, writeFileSync, existsSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import { dirname, join } from 'node:path'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
+const PERSIST_FILE = join(__dirname, 'cache.json')
+
+const app = express()
+const PORT = Number(process.env.PORT || 8787)
+
+const UNSPLASH_API_URL = process.env.UNSPLASH_API_URL || 'https://api.unsplash.com'
+const UNSPLASH_ACCESS_KEY =
+  process.env.UNSPLASH_ACCESS_KEY || process.env.VITE_UNSPLASH_ACCESS_KEY || ''
+const UNSPLASH_UTM = 'utm_source=autodash&utm_medium=referral'
+const OPENF1_BASE = process.env.OPENF1_URL || process.env.VITE_OPENF1_URL || 'https://api.openf1.org/v1'
+const OPEN_METEO_URL =
+  process.env.OPEN_METEO_URL ||
+  process.env.VITE_OPEN_METEO_URL ||
+  'https://api.open-meteo.com/v1/forecast'
+const OPENF1_TTL_MS = 30 * 60 * 1000
+const WEATHER_TTL_MS = 30 * 1000
+
+const DRIVER_NATIONALITIES = {
+  1: 'nl',
+  3: 'nl',
+  4: 'gb',
+  5: 'br',
+  6: 'fr',
+  10: 'fr',
+  11: 'mx',
+  12: 'it',
+  14: 'es',
+  16: 'mc',
+  18: 'ca',
+  23: 'th',
+  27: 'de',
+  30: 'nz',
+  31: 'fr',
+  41: 'gb',
+  43: 'ar',
+  44: 'gb',
+  55: 'es',
+  63: 'gb',
+  77: 'fi',
+  81: 'au',
+  87: 'gb',
+}
+const CIRCUIT_COORDS = {
+  Sakhir: { latitude: 26.0325, longitude: 50.5106 },
+  Jeddah: { latitude: 21.6319, longitude: 39.1044 },
+  Melbourne: { latitude: -37.8497, longitude: 144.968 },
+  Suzuka: { latitude: 34.8431, longitude: 136.541 },
+  Shanghai: { latitude: 31.3389, longitude: 121.2197 },
+  Miami: { latitude: 25.9581, longitude: -80.2389 },
+  Imola: { latitude: 44.3439, longitude: 11.7167 },
+  'Monte Carlo': { latitude: 43.7347, longitude: 7.4206 },
+  Catalunya: { latitude: 41.57, longitude: 2.2611 },
+  Montreal: { latitude: 45.5006, longitude: -73.5228 },
+  Spielberg: { latitude: 47.2197, longitude: 14.7647 },
+  Silverstone: { latitude: 52.0786, longitude: -1.0169 },
+  Hungaroring: { latitude: 47.5789, longitude: 19.2486 },
+  'Spa-Francorchamps': { latitude: 50.4372, longitude: 5.9714 },
+  Zandvoort: { latitude: 52.3888, longitude: 4.5409 },
+  Monza: { latitude: 45.6156, longitude: 9.2811 },
+  Baku: { latitude: 40.3725, longitude: 49.8533 },
+  Singapore: { latitude: 1.2914, longitude: 103.8644 },
+  Austin: { latitude: 30.1328, longitude: -97.6411 },
+  'Mexico City': { latitude: 19.4042, longitude: -99.0907 },
+  Interlagos: { latitude: -23.7036, longitude: -46.6997 },
+  'Las Vegas': { latitude: 36.1147, longitude: -115.1728 },
+  Lusail: { latitude: 25.49, longitude: 51.4542 },
+  'Yas Marina Circuit': { latitude: 24.4672, longitude: 54.6031 },
+  Madring: { latitude: 40.4534, longitude: -3.6883 },
+}
+const SERVER_FALLBACK_PHOTOS = [
+  {
+    url: '/placeholders/ph1.jpg',
+    photographerName: 'F1 Unleashed',
+    profileUrl: `https://unsplash.com/@f1unleashed?${UNSPLASH_UTM}`,
+    unsplashUrl: `https://unsplash.com/photos/4oAq0VOYl9A?${UNSPLASH_UTM}`,
+  },
+  {
+    url: '/placeholders/ph2.jpg',
+    photographerName: 'Jack B',
+    profileUrl: `https://unsplash.com/@nervum?${UNSPLASH_UTM}`,
+    unsplashUrl: `https://unsplash.com/photos/EwUZ8hjWXSk?${UNSPLASH_UTM}`,
+  },
+  {
+    url: '/placeholders/ph3.jpg',
+    photographerName: 'Ank Kumar',
+    profileUrl: `https://unsplash.com/@ankkumar?${UNSPLASH_UTM}`,
+    unsplashUrl: `https://unsplash.com/photos/tGghQBM-RVo?${UNSPLASH_UTM}`,
+  },
+  {
+    url: '/placeholders/ph4.jpg',
+    photographerName: 'F1 Unleashed',
+    profileUrl: `https://unsplash.com/@f1unleashed?${UNSPLASH_UTM}`,
+    unsplashUrl: `https://unsplash.com/photos/J0PLcahCOVk?${UNSPLASH_UTM}`,
+  },
+  {
+    url: '/placeholders/ph5.jpg',
+    photographerName: 'Mr. AN',
+    profileUrl: `https://unsplash.com/@mran123?${UNSPLASH_UTM}`,
+    unsplashUrl: `https://unsplash.com/photos/IFFPJpbF4CM?${UNSPLASH_UTM}`,
+  },
+]
+
+let cache = {
+  hourBucket: null,
+  photos: null,
+}
+let inFlightPromise = null
+let dashboardCache = {
+  openf1: { updatedAt: 0, data: null },
+  weather: { updatedAt: 0, key: null, data: null },
+}
+try {
+  if (existsSync(PERSIST_FILE)) {
+    const saved = JSON.parse(readFileSync(PERSIST_FILE, 'utf-8'))
+    if (saved?.openf1) dashboardCache.openf1 = saved.openf1
+    if (saved?.weather) dashboardCache.weather = saved.weather
+  }
+} catch {
+  // corrupt or missing file — start with empty cache
+}
+let dashboardInFlightPromise = null
+
+function getCurrentHourBucketUtc() {
+  return Math.floor(Date.now() / (60 * 60 * 1000))
+}
+
+function mapUnsplashPhoto(photo) {
+  return {
+    url: photo?.urls?.regular || '',
+    photographerName: photo?.user?.name || 'Onbekend',
+    profileUrl: `${photo?.user?.links?.html || 'https://unsplash.com'}?${UNSPLASH_UTM}`,
+    unsplashUrl: `${photo?.links?.html || 'https://unsplash.com'}?${UNSPLASH_UTM}`,
+  }
+}
+
+function driverFlag(driverNumber) {
+  const code = DRIVER_NATIONALITIES[driverNumber]
+  return code ? `https://flagcdn.com/w40/${code}.png` : ''
+}
+
+async function requestJsonWithRetry(url, retries = 2, timeoutMs = 8000) {
+  let lastError = null
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+    try {
+      const res = await fetch(url, { signal: controller.signal })
+      clearTimeout(timeoutId)
+      if (!res.ok) {
+        const retryable = [429, 500, 502, 503, 504].includes(res.status)
+        if (retryable && attempt < retries) {
+          await new Promise((r) => setTimeout(r, 500 * (2 ** attempt)))
+          continue
+        }
+        throw new Error(`Request failed (${res.status}) for ${url}`)
+      }
+      return await res.json()
+    } catch (error) {
+      clearTimeout(timeoutId)
+      lastError = error
+      if (attempt < retries) {
+        await new Promise((r) => setTimeout(r, 500 * (2 ** attempt)))
+      }
+    }
+  }
+  throw lastError || new Error(`Request failed for ${url}`)
+}
+
+async function fetchOpenF1Snapshot() {
+  const nowTs = Date.now()
+  if (dashboardCache.openf1.data && nowTs - dashboardCache.openf1.updatedAt < OPENF1_TTL_MS) {
+    return dashboardCache.openf1.data
+  }
+
+  const now = new Date()
+  const year = now.getFullYear()
+  const meetings = await requestJsonWithRetry(`${OPENF1_BASE}/meetings?year=${year}`)
+  const raceSessions = await requestJsonWithRetry(`${OPENF1_BASE}/sessions?session_name=Race&year=${year}`)
+  let allMeetings = Array.isArray(meetings) ? meetings : []
+
+  const hasUpcomingCurrentYearRace = allMeetings.some(
+    (m) =>
+      !m.is_cancelled &&
+      String(m.meeting_name || '').toLowerCase().includes('grand prix') &&
+      new Date(m.date_start) > now
+  )
+  if (!hasUpcomingCurrentYearRace) {
+    try {
+      const nextYearMeetings = await requestJsonWithRetry(`${OPENF1_BASE}/meetings?year=${year + 1}`)
+      allMeetings = allMeetings.concat(Array.isArray(nextYearMeetings) ? nextYearMeetings : [])
+    } catch {
+      // no-op
+    }
+  }
+
+  const upcomingRace =
+    allMeetings
+      .filter(
+        (m) =>
+          !m.is_cancelled &&
+          String(m.meeting_name || '').toLowerCase().includes('grand prix') &&
+          new Date(m.date_start) > now
+      )
+      .sort((a, b) => new Date(a.date_start) - new Date(b.date_start))[0] || null
+
+  const latestSession =
+    (Array.isArray(raceSessions) ? raceSessions : [])
+      .filter((s) => s.date_end && new Date(s.date_end) <= now && !s.is_cancelled)
+      .sort((a, b) => new Date(b.date_end) - new Date(a.date_end))[0] || null
+
+  const sessionKey = latestSession?.session_key || null
+  let drivers = []
+  let seasonStats = []
+  if (sessionKey) {
+    const driversData = await requestJsonWithRetry(`${OPENF1_BASE}/drivers?session_key=${sessionKey}`)
+    const standingsData = await requestJsonWithRetry(
+      `${OPENF1_BASE}/championship_drivers?session_key=${sessionKey}`
+    )
+    drivers = (Array.isArray(driversData) ? driversData : [])
+      .map((d) => ({
+        name: `${d.first_name ?? ''} ${d.last_name ?? ''}`.trim() || d.broadcast_name || 'Onbekend',
+        number: d.driver_number ?? '-',
+        flag: driverFlag(d.driver_number),
+      }))
+      .sort((a, b) => Number(a.number) - Number(b.number))
+
+    const driverByNumber = new Map((Array.isArray(driversData) ? driversData : []).map((d) => [d.driver_number, d]))
+    seasonStats = (Array.isArray(standingsData) ? standingsData : [])
+      .map((row) => {
+        const driver = driverByNumber.get(row.driver_number)
+        return {
+          position: row.position_current ?? row.position_start ?? null,
+          name: driver
+            ? `${driver.first_name ?? ''} ${driver.last_name ?? ''}`.trim() || driver.broadcast_name
+            : `#${row.driver_number}`,
+          points: row.points_current ?? row.points_start ?? 0,
+          flag: driverFlag(row.driver_number),
+        }
+      })
+      .filter((r) => r.position !== null)
+      .sort((a, b) => Number(a.position) - Number(b.position))
+  }
+
+  const nextRace = upcomingRace
+    ? {
+        ...upcomingRace,
+        countryName: upcomingRace.country_name || 'Land onbekend',
+        countryFlag: upcomingRace.country_flag || '',
+        circuitName: upcomingRace.circuit_short_name || upcomingRace.location || 'Circuit onbekend',
+        circuitImage: upcomingRace.circuit_image || null,
+      }
+    : null
+
+  const snapshot = {
+    nextRace,
+    drivers,
+    seasonStats,
+    seasonStatsYear: year,
+    timestamps: {
+      nextRaceUpdatedAt: nowTs,
+      driversUpdatedAt: nowTs,
+      seasonStatsUpdatedAt: nowTs,
+    },
+  }
+  dashboardCache.openf1 = { updatedAt: nowTs, data: snapshot }
+  try {
+    writeFileSync(PERSIST_FILE, JSON.stringify(dashboardCache), 'utf-8')
+  } catch { /* disk write failure is non-fatal */ }
+  console.log('[OpenF1] Snapshot fetched successfully — nextRace:', snapshot.nextRace?.meeting_name ?? 'none', '| drivers:', snapshot.drivers.length, '| seasonStats:', snapshot.seasonStats.length)
+  return snapshot
+}
+
+async function fetchWeatherSnapshot(nextRace) {
+  const nowTs = Date.now()
+  if (!nextRace) return { weather: null, weatherUpdatedAt: 0 }
+  const weatherKey = `${nextRace.circuitName}|${nextRace.location}`
+  if (
+    dashboardCache.weather.data &&
+    dashboardCache.weather.key === weatherKey &&
+    nowTs - dashboardCache.weather.updatedAt < WEATHER_TTL_MS
+  ) {
+    return {
+      weather: dashboardCache.weather.data,
+      weatherUpdatedAt: dashboardCache.weather.updatedAt,
+    }
+  }
+
+  let coords = null
+  try {
+    const geo = await requestJsonWithRetry(
+      `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(
+        nextRace.location
+      )}&count=1&language=en&format=json`
+    )
+    const hit = geo?.results?.[0]
+    if (Number.isFinite(hit?.latitude) && Number.isFinite(hit?.longitude)) {
+      coords = { latitude: hit.latitude, longitude: hit.longitude }
+    }
+  } catch {
+    // no-op
+  }
+  if (!coords) coords = CIRCUIT_COORDS[nextRace.circuit_short_name] || null
+  if (!coords) return { weather: null, weatherUpdatedAt: 0 }
+
+  const weatherData = await requestJsonWithRetry(
+    `${OPEN_METEO_URL}?latitude=${coords.latitude}&longitude=${coords.longitude}&current=temperature_2m,wind_speed_10m,precipitation&timezone=auto`
+  )
+  const weather = { ...(weatherData?.current || {}), raceCircuit: nextRace.circuitName }
+  dashboardCache.weather = { updatedAt: nowTs, key: weatherKey, data: weather }
+  try {
+    writeFileSync(PERSIST_FILE, JSON.stringify(dashboardCache), 'utf-8')
+  } catch {}
+  return { weather, weatherUpdatedAt: nowTs }
+}
+
+async function getDashboardSnapshot() {
+  if (!dashboardInFlightPromise) {
+    dashboardInFlightPromise = (async () => {
+      const openf1 = await fetchOpenF1Snapshot()
+      const weather = await fetchWeatherSnapshot(openf1.nextRace)
+      return {
+        nextRace: openf1.nextRace,
+        drivers: openf1.drivers,
+        seasonStats: openf1.seasonStats,
+        seasonStatsYear: openf1.seasonStatsYear,
+        weather: weather.weather,
+        timestamps: {
+          ...openf1.timestamps,
+          weatherUpdatedAt: weather.weatherUpdatedAt,
+        },
+      }
+    })().finally(() => {
+      dashboardInFlightPromise = null
+    })
+  }
+  return dashboardInFlightPromise
+}
+
+async function fetchHourlyPhotosFromUnsplash() {
+  if (!UNSPLASH_ACCESS_KEY) {
+    throw new Error('UNSPLASH_ACCESS_KEY ontbreekt op server.')
+  }
+
+  const page = (getCurrentHourBucketUtc() % 100) + 1
+  const url = `${UNSPLASH_API_URL}/search/photos?query=formula%201%20motorsport&orientation=landscape&content_filter=high&per_page=5&page=${page}`
+  const res = await fetch(url, {
+    headers: { Authorization: `Client-ID ${UNSPLASH_ACCESS_KEY}` },
+  })
+  if (!res.ok) {
+    throw new Error(`Unsplash request failed (${res.status})`)
+  }
+
+  const data = await res.json()
+  const mappedPhotos = (Array.isArray(data?.results) ? data.results : [])
+    .map(mapUnsplashPhoto)
+    .filter((p) => p.url)
+    .slice(0, 5)
+
+  if (mappedPhotos.length !== 5) {
+    throw new Error('Onvoldoende fotos ontvangen van Unsplash.')
+  }
+  return mappedPhotos
+}
+
+async function getHourlyPhotos() {
+  const currentHour = getCurrentHourBucketUtc()
+  if (cache.hourBucket === currentHour && Array.isArray(cache.photos) && cache.photos.length === 5) {
+    return cache.photos
+  }
+
+  if (!inFlightPromise) {
+    inFlightPromise = fetchHourlyPhotosFromUnsplash()
+      .then((photos) => {
+        cache = { hourBucket: currentHour, photos }
+        return photos
+      })
+      .finally(() => {
+        inFlightPromise = null
+      })
+  }
+
+  return inFlightPromise
+}
+
+app.use(cors())
+
+app.get('/health', (_req, res) => {
+  res.json({ ok: true })
+})
+
+app.get('/api/unsplash-hourly', async (_req, res) => {
+  const currentHour = getCurrentHourBucketUtc()
+  try {
+    const photos = await getHourlyPhotos()
+    res.setHeader('Cache-Control', 'public, max-age=300')
+    res.json({ photos, source: 'server-hourly-cache', hourBucket: currentHour })
+  } catch (error) {
+    // Centrale fallback per uur zodat alle clients identieke data houden.
+    if (cache.hourBucket !== currentHour || !Array.isArray(cache.photos) || cache.photos.length !== 5) {
+      cache = { hourBucket: currentHour, photos: SERVER_FALLBACK_PHOTOS }
+    }
+    res.setHeader('Cache-Control', 'public, max-age=300')
+    res.json({
+      photos: cache.photos,
+      source: 'server-hourly-fallback',
+      hourBucket: currentHour,
+      detail: error instanceof Error ? error.message : 'Unknown error',
+    })
+  }
+})
+
+app.get('/api/dashboard-snapshot', async (_req, res) => {
+  try {
+    const data = await getDashboardSnapshot()
+    res.setHeader('Cache-Control', 'public, max-age=10')
+    res.json(data)
+  } catch (error) {
+    console.warn('[Dashboard] Fetch failed:', error.message)
+    // Serveer last-known-good snapshot als beschikbaar (ook al is TTL verlopen).
+    const lastKnownOpenf1 = dashboardCache.openf1?.data
+    if (lastKnownOpenf1) {
+      const lastKnownWeather = dashboardCache.weather?.data || null
+      res.setHeader('Cache-Control', 'no-store')
+      res.json({
+        ...lastKnownOpenf1,
+        weather: lastKnownWeather,
+        timestamps: {
+          ...lastKnownOpenf1.timestamps,
+          weatherUpdatedAt: dashboardCache.weather?.updatedAt || 0,
+        },
+        stale: true,
+      })
+    } else {
+      res.status(502).json({
+        error: 'Dashboard data tijdelijk niet beschikbaar.',
+        detail: error instanceof Error ? error.message : 'Unknown error',
+      })
+    }
+  }
+})
+
+const server = app.listen(PORT, () => {
+  console.log(`AutoDash API running on http://localhost:${PORT}`)
+  // Warm up cache so the first user request is never cold.
+  getDashboardSnapshot().catch((err) =>
+    console.warn('[Startup] Dashboard snapshot warmup failed:', err.message)
+  )
+  fetchHourlyPhotosFromUnsplash().catch(() => {})
+})
+
+server.on('close', () => {
+  console.log('AutoDash API server closed.')
+})
+
+// Keep process alive in local dev shells where handles can be detached.
+setInterval(() => {}, 60 * 1000)
