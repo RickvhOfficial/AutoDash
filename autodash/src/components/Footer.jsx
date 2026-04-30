@@ -19,7 +19,7 @@ const Footer = forwardRef(function Footer(_props, ref) {
           className="mx-auto block h-auto max-h-16 w-auto max-w-[min(100%,12rem)] shrink-0 object-contain object-center pb-3 md:pb-4"
         />
         <p className="shrink-0 text-sm italic text-slate-500 md:text-base">
-          Driven by Code. Addicted to Speed.
+          Driven <span className="text-red-600">by</span> Code. Addicted <span className="text-red-600">to</span> Speed.
         </p>
         <p className="mt-2 shrink-0 text-sm text-slate-400 md:text-base">
           Gemaakt door RickvhOfficial{' '}

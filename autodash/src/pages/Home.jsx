@@ -1,4 +1,4 @@
-﻿import axios from 'axios'
+import axios from 'axios'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import LoadingSpinner from '../components/LoadingSpinner'
@@ -106,15 +106,42 @@ const CIRCUIT_COORDS = {
 }
 
 // ── localStorage-cache helpers ────────────────────────────────────────────
-const CACHE_KEY = 'autodash_cache_v2'
+const CACHE_KEY_PREFIX = 'autodash_cache_v3'
 const CACHE_MAX_AGE_MS = 60 * 60 * 1000 // 60 minuten
 const UNSPLASH_BG_CACHE_KEY = 'autodash_unsplash_bg_v1'
 const UNSPLASH_BG_TTL_MS = 60 * 60 * 1000 // 60 minuten
 const UNSPLASH_UTM = 'utm_source=autodash&utm_medium=referral'
+const OPENF1_POLL_MS = 30 * 60 * 1000 // 30 minuten
+const INITIAL_LOADING_MAX_WAIT_MS = 2200
 
-function readCache() {
+function resolveCacheNamespace() {
   try {
-    const raw = localStorage.getItem(CACHE_KEY)
+    const possibleKeys = ['autodash_user', 'currentUser', 'authUser', 'user', 'profile']
+    for (const key of possibleKeys) {
+      const raw = localStorage.getItem(key)
+      if (!raw) continue
+      try {
+        const parsed = JSON.parse(raw)
+        const candidate =
+          parsed?.id || parsed?.userId || parsed?.uid || parsed?.email || parsed?.username
+        if (candidate) return String(candidate).toLowerCase()
+      } catch {
+        return String(raw).toLowerCase()
+      }
+    }
+  } catch {
+    // localStorage niet toegankelijk
+  }
+  return 'guest'
+}
+
+function getCacheKey() {
+  return `${CACHE_KEY_PREFIX}_${resolveCacheNamespace()}`
+}
+
+function readCache(cacheKey) {
+  try {
+    const raw = localStorage.getItem(cacheKey)
     if (!raw) return null
     const cache = JSON.parse(raw)
     if (!cache.savedAt || Date.now() - cache.savedAt > CACHE_MAX_AGE_MS) return null
@@ -124,11 +151,11 @@ function readCache() {
   }
 }
 
-function writeCache(partial) {
+function writeCache(cacheKey, partial) {
   try {
-    const existing = readCache() || {}
+    const existing = readCache(cacheKey) || {}
     localStorage.setItem(
-      CACHE_KEY,
+      cacheKey,
       JSON.stringify({ ...existing, ...partial, savedAt: Date.now() })
     )
   } catch {
@@ -162,7 +189,9 @@ function writeUnsplashCache(photos) {
 
 // ── Component ─────────────────────────────────────────────────────────────
 export default function Home() {
-  const cached = readCache()
+  const cacheKeyRef = useRef(getCacheKey())
+  const cacheKey = cacheKeyRef.current
+  const cached = readCache(cacheKey)
   const currentSeasonYear = new Date().getFullYear()
   const canUseLegacySeasonStatsCache =
     !cached?.seasonStatsYear &&
@@ -216,6 +245,8 @@ export default function Home() {
   const requestRunningRef = useRef(false)
   const refreshDelayRef = useRef(30000)
   const refreshFailureStreakRef = useRef(0)
+  const weatherFailureStreakRef = useRef(0)
+  const weatherRetryAfterRef = useRef(0)
   const latestRaceDataRef = useRef(cached?.nextRace ?? null)
   const latestCompletedRaceSessionKeyRef = useRef(null)
   const lastOpenF1FetchAtRef = useRef(
@@ -227,7 +258,8 @@ export default function Home() {
   )
 
   const WEATHER_POLL_MS = 30000
-  const OPENF1_POLL_MS = 180000
+  const WEATHER_RETRY_BASE_MS = 2 * 60 * 1000
+  const WEATHER_RETRY_MAX_MS = 30 * 60 * 1000
 
   const openF1Base   = import.meta.env.VITE_OPENF1_URL     || 'https://api.openf1.org/v1'
   const openMeteoUrl = import.meta.env.VITE_OPEN_METEO_URL || 'https://api.open-meteo.com/v1/forecast'
@@ -271,11 +303,11 @@ export default function Home() {
   )
 
   const openF1Client = useMemo(
-    () => axios.create({ baseURL: openF1Base, timeout: 15000 }),
+    () => axios.create({ baseURL: openF1Base, timeout: 9000 }),
     [openF1Base]
   )
-  const openMeteoClient = useMemo(() => axios.create({ timeout: 12000 }), [])
-  const geocodingClient = useMemo(() => axios.create({ timeout: 10000 }), [])
+  const openMeteoClient = useMemo(() => axios.create({ timeout: 7000 }), [])
+  const geocodingClient = useMemo(() => axios.create({ timeout: 5000 }), [])
 
   async function requestJson(client, url, signal) {
     try {
@@ -283,13 +315,22 @@ export default function Home() {
       return res.data
     } catch (error) {
       const status = error?.response?.status ?? 'unknown'
-      throw new Error(`API request failed (${status}) for ${url}`, { cause: error })
+      const wrapped = new Error(`API request failed (${status}) for ${url}`, { cause: error })
+      wrapped.status = status
+      wrapped.code = error?.code ?? null
+      wrapped.isAbort = signal?.aborted || error?.code === 'ERR_CANCELED'
+      wrapped.isNetworkError = !error?.response
+      throw wrapped
     }
   }
 
   useEffect(() => {
     let refreshTimer = null
     let currentController = null
+    const initialLoadingGuardTimer = setTimeout(() => {
+      setInitialLoading(false)
+      didLoadOnceRef.current = true
+    }, INITIAL_LOADING_MAX_WAIT_MS)
 
     function scheduleNextPoll() {
       if (refreshTimer) clearTimeout(refreshTimer)
@@ -305,7 +346,12 @@ export default function Home() {
       const year = new Date().getFullYear()
       const now = new Date()
       const nowTs = Date.now()
+      const hasDriversData = drivers.data.length > 0
+      const hasSeasonStatsData = seasonStats.data.length > 0
+      const shouldFetchWeather = nowTs >= weatherRetryAfterRef.current
       const shouldFetchOpenF1 =
+        !hasDriversData ||
+        !hasSeasonStatsData ||
         !lastOpenF1FetchAtRef.current ||
         nowTs - lastOpenF1FetchAtRef.current >= OPENF1_POLL_MS ||
         !latestRaceDataRef.current
@@ -317,137 +363,192 @@ export default function Home() {
       if (shouldFetchOpenF1) {
         setNextRace((prev) => ({ ...prev, loading: !prev.data, error: '' }))
       }
-      setWeather((prev) => ({ ...prev, loading: !prev.data, error: '' }))
+      if (shouldFetchWeather) {
+        setWeather((prev) => ({ ...prev, loading: !prev.data, error: '' }))
+      }
       if (shouldFetchOpenF1) {
         setDrivers((prev) => ({ ...prev, loading: prev.data.length === 0 && !prev.error, error: '' }))
         setSeasonStats((prev) => ({ ...prev, loading: prev.data.length === 0 && !prev.error, error: '' }))
       }
 
-      if (shouldFetchOpenF1) {
-        // ── OpenF1 fetch (minder vaak dan weer) ───────────────────────────
-        const [
-          currentYearMeetingsRes,
-          nextYearMeetingsRes,
-          currentYearRaceSessionsRes,
-        ] = await Promise.allSettled([
-          requestJson(openF1Client, `/meetings?year=${year}`, signal),
-          requestJson(openF1Client, `/meetings?year=${year + 1}`, signal),
-          requestJson(openF1Client, `/sessions?session_name=Race&year=${year}`, signal),
-        ])
+      try {
+        if (shouldFetchOpenF1) {
+          // ── OpenF1 fetch (minder vaak dan weer) ───────────────────────────
+          const [currentYearMeetingsRes, currentYearRaceSessionsRes] = await Promise.allSettled([
+            requestJson(openF1Client, `/meetings?year=${year}`, signal),
+            requestJson(openF1Client, `/sessions?session_name=Race&year=${year}`, signal),
+          ])
 
-        const allMeetings = [
-          ...(currentYearMeetingsRes.status === 'fulfilled' ? currentYearMeetingsRes.value : []),
-          ...(nextYearMeetingsRes.status === 'fulfilled' ? nextYearMeetingsRes.value : []),
-        ]
-        const currentYearRaceSessions =
-          currentYearRaceSessionsRes.status === 'fulfilled' ? currentYearRaceSessionsRes.value : []
-        if (currentYearMeetingsRes.status !== 'fulfilled' && nextYearMeetingsRes.status !== 'fulfilled') {
-          hadApiFailure = true
-        }
-        if (currentYearRaceSessionsRes.status !== 'fulfilled') {
-          hadApiFailure = true
-        }
-
-        const latestCurrentYearRaceSession = currentYearRaceSessions
-          .filter((s) => s.date_end && new Date(s.date_end) <= now && !s.is_cancelled)
-          .sort((a, b) => new Date(b.date_end) - new Date(a.date_end))[0]
-
-        // Alleen actuele seizoensdata gebruiken: geen fallback naar vorig jaar.
-        latestCompletedRaceSessionKey = latestCurrentYearRaceSession?.session_key || null
-        latestCompletedRaceSessionKeyRef.current = latestCompletedRaceSessionKey
-
-        // ── Volgende race ──────────────────────────────────────────────────
-        try {
-          const upcomingRace =
-            allMeetings
-              .filter(
-                (m) =>
-                  !m.is_cancelled &&
-                  m.meeting_name.toLowerCase().includes('grand prix') &&
-                  new Date(m.date_start) > now
-              )
-              .sort((a, b) => new Date(a.date_start) - new Date(b.date_start))[0] || null
-
-          if (!upcomingRace) throw new Error('Geen komende Grand Prix gevonden.')
-
-          raceData = {
-            ...upcomingRace,
-            countryName: upcomingRace.country_name || 'Land onbekend',
-            countryFlag: upcomingRace.country_flag || '',
-            circuitName: upcomingRace.circuit_short_name || upcomingRace.location || 'Circuit onbekend',
-            circuitImage: upcomingRace.circuit_image || null,
+          const allMeetings = [
+            ...(currentYearMeetingsRes.status === 'fulfilled' ? currentYearMeetingsRes.value : []),
+          ]
+          let nextYearMeetings = []
+          if (currentYearMeetingsRes.status === 'fulfilled') {
+            const hasUpcomingCurrentYearRace = currentYearMeetingsRes.value.some(
+              (m) =>
+                !m.is_cancelled &&
+                m.meeting_name.toLowerCase().includes('grand prix') &&
+                new Date(m.date_start) > now
+            )
+            if (!hasUpcomingCurrentYearRace) {
+              try {
+                nextYearMeetings = await requestJson(openF1Client, `/meetings?year=${year + 1}`, signal)
+              } catch {
+                hadApiFailure = true
+              }
+            }
+          }
+          allMeetings.push(...nextYearMeetings)
+          const currentYearRaceSessions =
+            currentYearRaceSessionsRes.status === 'fulfilled' ? currentYearRaceSessionsRes.value : []
+          if (currentYearMeetingsRes.status !== 'fulfilled' && nextYearMeetings.length === 0) {
+            hadApiFailure = true
+          }
+          if (currentYearRaceSessionsRes.status !== 'fulfilled') {
+            hadApiFailure = true
           }
 
-          const raceNowTs = Date.now()
-          setNextRace({ loading: false, error: '', data: raceData, stale: false, lastUpdated: raceNowTs })
-          cacheUpdate.nextRace = raceData
-          cacheUpdate.nextRaceUpdatedAt = raceNowTs
-          latestRaceDataRef.current = raceData
+          const latestCurrentYearRaceSession = currentYearRaceSessions
+            .filter((s) => s.date_end && new Date(s.date_end) <= now && !s.is_cancelled)
+            .sort((a, b) => new Date(b.date_end) - new Date(a.date_end))[0]
+
+          // Alleen actuele seizoensdata gebruiken: geen fallback naar vorig jaar.
+          latestCompletedRaceSessionKey = latestCurrentYearRaceSession?.session_key || null
+          latestCompletedRaceSessionKeyRef.current = latestCompletedRaceSessionKey
+
+          // ── Volgende race ──────────────────────────────────────────────────
+          try {
+            const upcomingRace =
+              allMeetings
+                .filter(
+                  (m) =>
+                    !m.is_cancelled &&
+                    m.meeting_name.toLowerCase().includes('grand prix') &&
+                    new Date(m.date_start) > now
+                )
+                .sort((a, b) => new Date(a.date_start) - new Date(b.date_start))[0] || null
+
+            if (!upcomingRace) throw new Error('Geen komende Grand Prix gevonden.')
+
+            raceData = {
+              ...upcomingRace,
+              countryName: upcomingRace.country_name || 'Land onbekend',
+              countryFlag: upcomingRace.country_flag || '',
+              circuitName: upcomingRace.circuit_short_name || upcomingRace.location || 'Circuit onbekend',
+              circuitImage: upcomingRace.circuit_image || null,
+            }
+
+            const raceNowTs = Date.now()
+            setNextRace({ loading: false, error: '', data: raceData, stale: false, lastUpdated: raceNowTs })
+            cacheUpdate.nextRace = raceData
+            cacheUpdate.nextRaceUpdatedAt = raceNowTs
+            latestRaceDataRef.current = raceData
+          } catch (error) {
+            console.error('[NextRace]', error)
+            hadApiFailure = true
+            setNextRace((prev) =>
+              prev.data
+                ? { ...prev, loading: false, error: '', stale: true }
+                : {
+                    ...prev,
+                    loading: false,
+                    error: 'Geen komende Grand Prix gevonden.',
+                    stale: false,
+                  }
+            )
+          }
+        }
+
+        // ── Weer op circuit ────────────────────────────────────────────────
+        try {
+          if (!shouldFetchWeather) {
+            // Backoff actief na netwerkfout; behoud huidige data/status.
+          } else {
+            if (!raceData) throw new Error('Geen race-data beschikbaar voor weerlocatie.')
+
+            let coords = null
+
+            try {
+              const geoRes = await geocodingClient.get(
+                `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(raceData.location)}&count=1&language=en&format=json`,
+                { signal }
+              )
+              const hit = geoRes.data?.results?.[0]
+              if (Number.isFinite(hit?.latitude) && Number.isFinite(hit?.longitude)) {
+                coords = { latitude: hit.latitude, longitude: hit.longitude }
+              }
+            } catch {
+              // Geocoding mislukt → fallback map
+            }
+
+            if (!coords) coords = CIRCUIT_COORDS[raceData.circuit_short_name] || null
+            if (!coords) throw new Error('Geen coördinaten beschikbaar voor dit circuit.')
+
+            const weatherData = await requestJson(
+              openMeteoClient,
+              `${openMeteoUrl}?latitude=${coords.latitude}&longitude=${coords.longitude}&current=temperature_2m,wind_speed_10m,precipitation&timezone=auto`,
+              signal
+            )
+
+            const nowTs = Date.now()
+            const weatherResult = { ...weatherData.current, raceCircuit: raceData.circuitName }
+            setWeather({ loading: false, error: '', data: weatherResult, stale: false, lastUpdated: nowTs })
+            cacheUpdate.weather = weatherResult
+            cacheUpdate.weatherUpdatedAt = nowTs
+            weatherFailureStreakRef.current = 0
+            weatherRetryAfterRef.current = 0
+          }
         } catch (error) {
-          console.error('[NextRace]', error)
+          if (!error?.isAbort) {
+            const isTransientWeatherFailure =
+              error?.isNetworkError ||
+              error?.status === 429 ||
+              error?.status === 503 ||
+              error?.status === 'unknown'
+            if (isTransientWeatherFailure) {
+              weatherFailureStreakRef.current += 1
+              const retryDelay = Math.min(
+                WEATHER_RETRY_BASE_MS * (2 ** (weatherFailureStreakRef.current - 1)),
+                WEATHER_RETRY_MAX_MS
+              )
+              weatherRetryAfterRef.current = Date.now() + retryDelay
+            } else {
+              weatherFailureStreakRef.current = 0
+              weatherRetryAfterRef.current = 0
+            }
+            console.error('[Weather]', error)
+          }
           hadApiFailure = true
-          setNextRace((prev) =>
+          setWeather((prev) =>
             prev.data
               ? { ...prev, loading: false, error: '', stale: true }
-              : { ...prev, loading: true, error: '', stale: false }
+              : { ...prev, loading: false, error: 'Weer tijdelijk niet beschikbaar.', stale: false }
           )
         }
-      }
 
-      // ── Weer op circuit ────────────────────────────────────────────────
-      try {
-        if (!raceData) throw new Error('Geen race-data beschikbaar voor weerlocatie.')
+        // ── Coureurs lijst & Seizoen ranglijst (OpenF1, throttled) ─────────
+        if (shouldFetchOpenF1) {
+          try {
+            if (!latestCompletedRaceSessionKey) {
+              setDrivers((prev) =>
+                prev.data.length > 0
+                  ? { ...prev, loading: false, error: '', stale: true }
+                  : { ...prev, loading: false, error: 'Nog geen afgeronde races in dit seizoen.', stale: false }
+              )
+              setSeasonStats((prev) =>
+                prev.data.length > 0
+                  ? { ...prev, loading: false, error: '', stale: true }
+                  : { ...prev, loading: false, error: 'Nog geen afgeronde races in dit seizoen.', stale: false }
+              )
+              return
+            }
 
-        let coords = null
+            const sessionKey = latestCompletedRaceSessionKey
 
-        try {
-          const geoRes = await geocodingClient.get(
-            `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(raceData.location)}&count=1&language=en&format=json`,
-            { signal }
-          )
-          const hit = geoRes.data?.results?.[0]
-          if (Number.isFinite(hit?.latitude) && Number.isFinite(hit?.longitude)) {
-            coords = { latitude: hit.latitude, longitude: hit.longitude }
-          }
-        } catch {
-          // Geocoding mislukt → fallback map
-        }
-
-        if (!coords) coords = CIRCUIT_COORDS[raceData.circuit_short_name] || null
-        if (!coords) throw new Error('Geen coördinaten beschikbaar voor dit circuit.')
-
-        const weatherData = await requestJson(
-          openMeteoClient,
-          `${openMeteoUrl}?latitude=${coords.latitude}&longitude=${coords.longitude}&current=temperature_2m,wind_speed_10m,precipitation&timezone=auto`,
-          signal
-        )
-
-        const weatherResult = { ...weatherData.current, raceCircuit: raceData.circuitName }
-        const nowTs = Date.now()
-        setWeather({ loading: false, error: '', data: weatherResult, stale: false, lastUpdated: nowTs })
-        cacheUpdate.weather = weatherResult
-        cacheUpdate.weatherUpdatedAt = nowTs
-      } catch (error) {
-        console.error('[Weather]', error)
-        hadApiFailure = true
-        setWeather((prev) =>
-          prev.data
-            ? { ...prev, loading: false, error: '', stale: true }
-            : { ...prev, loading: true, error: '', stale: false }
-        )
-      }
-
-      // ── Coureurs lijst & Seizoen ranglijst (OpenF1, throttled) ─────────
-      if (shouldFetchOpenF1) {
-        try {
-          const sessionKey = latestCompletedRaceSessionKey || 'latest'
-
-          const [driversRes, standingsRes] = await Promise.allSettled([
-            requestJson(openF1Client, `/drivers?session_key=${sessionKey}`, signal),
-            latestCompletedRaceSessionKey
-              ? requestJson(openF1Client, `/championship_drivers?session_key=${latestCompletedRaceSessionKey}`, signal)
-              : Promise.reject(new Error('Geen afgeronde race-sessie voor standings.')),
-          ])
+            const [driversRes, standingsRes] = await Promise.allSettled([
+              requestJson(openF1Client, `/drivers?session_key=${sessionKey}`, signal),
+              requestJson(openF1Client, `/championship_drivers?session_key=${latestCompletedRaceSessionKey}`, signal),
+            ])
 
           if (driversRes.status === 'fulfilled') {
             const mappedDrivers = driversRes.value
@@ -510,37 +611,43 @@ export default function Home() {
                 : { ...prev, loading: false, error: 'Geen actuele seizoensstand beschikbaar.', stale: false }
             )
           }
-        } catch (error) {
-          console.error('[Drivers/Standings]', error)
-          hadApiFailure = true
-          setSeasonStats((prev) =>
-            prev.data.length > 0
-              ? { ...prev, loading: false, error: '', stale: true }
-              : { ...prev, loading: false, error: 'Geen actuele seizoensstand beschikbaar.', stale: false }
-          )
-        } finally {
-          lastOpenF1FetchAtRef.current = Date.now()
+          } catch (error) {
+            console.error('[Drivers/Standings]', error)
+            hadApiFailure = true
+            setSeasonStats((prev) =>
+              prev.data.length > 0
+                ? { ...prev, loading: false, error: '', stale: true }
+                : { ...prev, loading: false, error: 'Geen actuele seizoensstand beschikbaar.', stale: false }
+            )
+          } finally {
+            lastOpenF1FetchAtRef.current = Date.now()
+          }
         }
-      }
 
-      // Cache bijwerken voor elk onderdeel dat succesvol was geladen
-      if (Object.keys(cacheUpdate).length > 0) {
-        writeCache(cacheUpdate)
+        // Cache bijwerken voor elk onderdeel dat succesvol was geladen
+        if (Object.keys(cacheUpdate).length > 0) {
+          writeCache(cacheKey, cacheUpdate)
+        }
+        if (hadApiFailure) refreshFailureStreakRef.current += 1
+        else refreshFailureStreakRef.current = 0
+      } catch (error) {
+        console.error('[DashboardLoad]', error)
+        refreshFailureStreakRef.current += 1
+      } finally {
+        if (!didLoadOnceRef.current) {
+          didLoadOnceRef.current = true
+          setInitialLoading(false)
+        }
+        refreshDelayRef.current = WEATHER_POLL_MS
+        setRefreshing(false)
+        requestRunningRef.current = false
+        scheduleNextPoll()
       }
-      if (!didLoadOnceRef.current) {
-        didLoadOnceRef.current = true
-        setInitialLoading(false)
-      }
-      if (hadApiFailure) refreshFailureStreakRef.current += 1
-      else refreshFailureStreakRef.current = 0
-      refreshDelayRef.current = WEATHER_POLL_MS
-      setRefreshing(false)
-      requestRunningRef.current = false
-      scheduleNextPoll()
     }
 
     loadDashboardData()
     return () => {
+      clearTimeout(initialLoadingGuardTimer)
       if (refreshTimer) clearTimeout(refreshTimer)
       if (currentController) currentController.abort()
       // Reset lock bij cleanup zodat React StrictMode remount correct werkt
@@ -671,7 +778,7 @@ export default function Home() {
                     <span className="mb-3 block h-0.5 w-14 rounded-full bg-red-500/70" />
                     <h2 className="border-l-2 border-red-500/70 pl-2 text-sm font-semibold">Volgende race</h2>
                     {nextRace.loading && !nextRace.data && (
-                      <div className="mt-6 flex min-h-[7rem] items-center justify-center">
+                      <div className="mt-3.5 flex min-h-[7rem] items-center justify-center">
                         <LoadingSpinner compact message="" />
                       </div>
                     )}
@@ -714,7 +821,7 @@ export default function Home() {
                   <div className="relative z-10">
                     <h2 className="text-sm font-semibold">Weer op circuit</h2>
                     {weather.loading && !weather.data && (
-                      <div className="mt-6 flex min-h-[7rem] items-center justify-center">
+                      <div className="mt-3.5 flex min-h-[7rem] items-center justify-center">
                         <LoadingSpinner compact message="" />
                       </div>
                     )}
@@ -742,7 +849,7 @@ export default function Home() {
                   <div className="relative z-10">
                     <h2 className="text-sm font-semibold">Coureurs lijst</h2>
                     {drivers.loading && drivers.data.length === 0 && (
-                      <div className="mt-6 flex min-h-[7rem] items-center justify-center">
+                      <div className="mt-3.5 flex min-h-[7rem] items-center justify-center">
                         <LoadingSpinner compact message="" />
                       </div>
                     )}
@@ -792,7 +899,7 @@ export default function Home() {
                       )}
                     </div>
                     {seasonStats.loading && seasonStats.data.length === 0 && (
-                      <div className="mt-6 flex min-h-[7rem] items-center justify-center">
+                      <div className="mt-3.5 flex min-h-[7rem] items-center justify-center">
                         <LoadingSpinner compact message="" />
                       </div>
                     )}
