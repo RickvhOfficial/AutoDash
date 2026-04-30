@@ -1,3 +1,4 @@
+// Herbruikbare loading-state; compact variant voor kleine kaartsecties.
 export default function LoadingSpinner({ message = 'Data laden...', compact = false }) {
   return (
     <div

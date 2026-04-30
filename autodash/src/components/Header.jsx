@@ -11,7 +11,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
   faCar,
   faCloudSun,
-  faFlagCheckered,
+  faCalendar,
   faGaugeHigh,
   faHouse,
   faStopwatch,
@@ -21,7 +21,7 @@ import {
 // Eén centrale definitie voor routes: label + Font Awesome icoon (fallback: faGaugeHigh)
 const navLinks = [
   { path: '/', label: 'Home', icon: faHouse },
-  { path: '/races', label: 'Races', icon: faFlagCheckered },
+  { path: '/races', label: 'Racekalender', icon: faCalendar },
   { path: '/standings', label: 'Standen', icon: faTrophy },
   { path: '/weather', label: 'Weer', icon: faCloudSun },
   { path: '/vehicles', label: 'Voertuigen', icon: faCar },

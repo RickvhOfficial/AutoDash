@@ -1,3 +1,4 @@
+// Generieke HTTP-helpers met retry/backoff voor externe API-calls.
 import axios from 'axios'
 
 export const API_RETRY_ATTEMPTS = 2
@@ -7,6 +8,7 @@ export function createHttpClient(config = {}) {
   return axios.create(config)
 }
 
+// Verrijkt axios-fouten met uniforme metadata voor retrylogica.
 export function normalizeRequestError(error, signal, url) {
   const status = error?.response?.status ?? 'unknown'
   const wrapped = new Error(`API request failed (${status}) for ${url}`, { cause: error })
@@ -17,6 +19,7 @@ export function normalizeRequestError(error, signal, url) {
   return wrapped
 }
 
+// Basis JSON request met centrale foutnormalisatie.
 export async function requestJson(client, url, signal) {
   try {
     const res = await client.get(url, { signal })
@@ -26,6 +29,7 @@ export async function requestJson(client, url, signal) {
   }
 }
 
+// Bepaalt of foutcodes/netwerkissues opnieuw geprobeerd moeten worden.
 export function shouldRetryApiError(error) {
   if (error?.isAbort) return false
   const status = Number(error?.status)
@@ -55,6 +59,7 @@ export async function waitForRetry(delayMs, signal) {
   })
 }
 
+// Retry-loop met exponential backoff.
 export async function requestJsonWithRetry(
   client,
   url,

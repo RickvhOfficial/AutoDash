@@ -1,3 +1,4 @@
+// Weerservice: circuitcoordinaten, retryberekening en actuele weersnapshot per race.
 import { requestJsonWithRetry } from './httpClient'
 
 export const CIRCUIT_COORDS = {
@@ -35,6 +36,7 @@ export function computeWeatherRetryDelay(failureStreak) {
   return Math.min(WEATHER_RETRY_BASE_MS * (2 ** (failureStreak - 1)), WEATHER_RETRY_MAX_MS)
 }
 
+// Bepaalt coordinaten (geocoding of fallback-map) en haalt Open-Meteo current weather op.
 export async function fetchWeatherForRace({
   raceData,
   geocodingClient,

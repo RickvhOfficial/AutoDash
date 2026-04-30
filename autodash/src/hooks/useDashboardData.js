@@ -1,3 +1,4 @@
+// Centrale dashboard-hook: laadt widgets, beheert polling en combineert cache + fallback.
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { getCacheKey, readCache, readUnsplashCache, writeCache } from '../services/cacheService'
 import {
@@ -20,6 +21,7 @@ export function useDashboardData() {
     cached.seasonStats.length > 0 &&
     Number(cached?.nextRace?.year) === currentSeasonYear
 
+  // Bouwt een consistente state-shape voor alle dashboardwidgets.
   const buildWidgetState = (data, emptyValue, updatedAt) => {
     const normalizedData = data ?? emptyValue
     const hasData = Array.isArray(normalizedData)
@@ -71,6 +73,7 @@ export function useDashboardData() {
 
   const fallbackPhotos = useMemo(() => buildFallbackPhotos(), [])
 
+  // Pollt dashboard-snapshot met backoff en bewaart bruikbare data in local cache.
   useEffect(() => {
     let refreshTimer = null
     let currentController = null
@@ -79,11 +82,13 @@ export function useDashboardData() {
       didLoadOnceRef.current = true
     }, INITIAL_LOADING_MAX_WAIT_MS)
 
+    // Plan volgende refresh op basis van huidige succes/failure delay.
     function scheduleNextPoll() {
       if (refreshTimer) clearTimeout(refreshTimer)
       refreshTimer = setTimeout(loadDashboardData, refreshDelayRef.current)
     }
 
+    // Haalt alle dashboarddata op uit de server-snapshot.
     async function loadDashboardData() {
       if (requestRunningRef.current) return
       requestRunningRef.current = true
@@ -212,6 +217,7 @@ export function useDashboardData() {
     }
   }, [cacheKey])
 
+  // Laadt achtergrondfotos (API of cache/fallback) los van widget polling.
   useEffect(() => {
     const controller = new AbortController()
     async function loadUnsplashImages() {

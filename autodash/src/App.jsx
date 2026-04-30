@@ -11,6 +11,7 @@ import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom'
 import Header, { MenuToggleIcon } from './components/Header'
 import LogoBanner from './components/LogoBanner'
 import Footer from './components/Footer'
+import ErrorMessage from './components/ErrorMessage'
 import Home, { HomeHero, HOME_HERO_HEIGHT_PX } from './pages/Home'
 import RaceCalendar from './pages/RaceCalendar'
 import DriverStandings from './pages/DriverStandings'
@@ -28,6 +29,17 @@ function AppLayout() {
   const [sidebarWidthAnimDone, setSidebarWidthAnimDone] = useState(true)
   const prevMenuOpenRef = useRef(menuOpen)
   const sidebarAnimFallbackRef = useRef(null)
+  const [apiUnavailable, setApiUnavailable] = useState(false)
+
+  // Centrale API health-check: bij backend-uitval tonen we een globale foutmelding.
+  const checkApiHealth = useRef(async () => {
+    try {
+      const res = await fetch('/health')
+      setApiUnavailable(!res.ok)
+    } catch {
+      setApiUnavailable(true)
+    }
+  }).current
 
   // Scroll-lock alleen op smalle viewports als het mobiele menu open is (achtergrond scrollt niet mee)
   useEffect(() => {
@@ -43,6 +55,15 @@ function AppLayout() {
       document.body.style.overflow = ''
     }
   }, [menuOpen])
+
+  useEffect(() => {
+    let timer = null
+    checkApiHealth()
+    timer = setInterval(checkApiHealth, 30000)
+    return () => {
+      if (timer) clearInterval(timer)
+    }
+  }, [checkApiHealth])
 
   // Escape sluit alleen het mobiele fullscreen-menu (niet de desktop-sidebar)
   useEffect(() => {
@@ -60,6 +81,8 @@ function AppLayout() {
   }, [menuOpen])
 
   const isHome = location.pathname === '/'
+  const isRaceCalendar = location.pathname === '/races'
+  const usesTopHeroLayout = isHome || isRaceCalendar
 
   const footerRef = useRef(null)
 
@@ -135,7 +158,7 @@ function AppLayout() {
 
   return (
     <div className="flex min-h-screen flex-col overflow-x-hidden bg-slate-950 text-slate-100">
-      <LogoBanner heroOverlay={isHome} />
+      <LogoBanner heroOverlay={usesTopHeroLayout} />
 
       {isHome && <HomeHero />}
 
@@ -185,24 +208,37 @@ function AppLayout() {
 
       {/* lg: inspring = smalle sidebar (4.5rem) + kleine lucht; aside left-0 */}
       <main
-        className={`flex min-h-0 flex-1 flex-col pl-0 lg:pl-[5rem] ${
-          isHome ? 'pt-0' : 'pt-24'
+        className={`flex min-h-0 flex-1 flex-col pl-0 ${
+          isRaceCalendar ? 'lg:pl-0' : 'lg:pl-[5rem]'
+        } ${
+          usesTopHeroLayout ? 'pt-0' : 'pt-24'
         }`}
       >
-        <div
-          key={location.pathname}
-          className="page-transition-enter flex min-h-0 flex-1 flex-col"
-        >
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/races" element={<RaceCalendar />} />
-            <Route path="/standings" element={<DriverStandings />} />
-            <Route path="/weather" element={<CircuitWeather />} />
-            <Route path="/vehicles" element={<VehicleSearch />} />
-            <Route path="/lap-tracker" element={<LapTracker />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </div>
+        {apiUnavailable ? (
+          <div className="flex min-h-0 flex-1 items-center justify-center px-6 py-10 md:px-10">
+            <div className="w-full max-w-2xl">
+              <ErrorMessage
+                message="De API is momenteel niet beschikbaar. Controleer of de backend draait en probeer opnieuw."
+                onRetry={checkApiHealth}
+              />
+            </div>
+          </div>
+        ) : (
+          <div
+            key={location.pathname}
+            className="page-transition-enter flex min-h-0 flex-1 flex-col"
+          >
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/races" element={<RaceCalendar />} />
+              <Route path="/standings" element={<DriverStandings />} />
+              <Route path="/weather" element={<CircuitWeather />} />
+              <Route path="/vehicles" element={<VehicleSearch />} />
+              <Route path="/lap-tracker" element={<LapTracker />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </div>
+        )}
       </main>
 
       <Footer ref={footerRef} />

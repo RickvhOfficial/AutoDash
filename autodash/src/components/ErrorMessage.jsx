@@ -1,3 +1,4 @@
+// Herbruikbaar foutblok met optionele retry-knop voor API widgets.
 export default function ErrorMessage({ message, onRetry }) {
   return (
     <div className="rounded-lg border border-red-500 bg-red-900/20 p-6 text-center">

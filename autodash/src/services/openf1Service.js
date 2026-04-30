@@ -1,3 +1,4 @@
+// OpenF1 mappers/fetchers voor volgende race, drivers en season standings.
 import { requestJsonWithRetry } from './httpClient'
 
 // OpenF1 levert country_code=null voor alle rijders; bevestigd via session 11253 (Suzuka 2026).
@@ -32,6 +33,7 @@ export function driverFlag(driverNumber) {
   return code ? `https://flagcdn.com/w40/${code}.png` : ''
 }
 
+// Haalt context op (meetings/sessions) en bepaalt volgende race + laatste racesessie.
 export async function fetchOpenF1RaceContext({ openF1Client, year, now, signal }) {
   let hadApiFailure = false
   let currentYearMeetings = []
@@ -102,6 +104,7 @@ export async function fetchOpenF1RaceContext({ openF1Client, year, now, signal }
   return { upcomingRace, latestCompletedRaceSessionKey, hadApiFailure }
 }
 
+// Normaliseert OpenF1 raceobject naar frontend-vriendelijke velden.
 export function mapUpcomingRace(upcomingRace) {
   if (!upcomingRace) return null
   return {
@@ -113,6 +116,7 @@ export function mapUpcomingRace(upcomingRace) {
   }
 }
 
+// Haalt drivers + standings op van laatste afgeronde racesessie.
 export async function fetchDriversAndStandings({
   openF1Client,
   latestCompletedRaceSessionKey,
@@ -159,6 +163,7 @@ export async function fetchDriversAndStandings({
   }
 }
 
+// Zet ruwe OpenF1 drivers om naar lijstweergave.
 export function mapDrivers(driversData) {
   if (!Array.isArray(driversData)) return []
   return driversData
@@ -170,6 +175,7 @@ export function mapDrivers(driversData) {
     .sort((a, b) => Number(a.number) - Number(b.number))
 }
 
+// Combineert standings en driverdata tot complete ranglijstitems.
 export function mapStandings(standingsData, driversData) {
   if (!Array.isArray(standingsData) || !Array.isArray(driversData)) return []
   const driverByNumber = new Map(driversData.map((d) => [d.driver_number, d]))
