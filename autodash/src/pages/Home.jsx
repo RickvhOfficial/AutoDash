@@ -1,10 +1,8 @@
-import axios from 'axios'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import LoadingSpinner from '../components/LoadingSpinner'
+import { useDashboardData } from '../hooks/useDashboardData'
 
-// Route: /. — HomeHero staat in App.jsx buiten <main> (volle breedte, geen menu-padding).
-// Unsplash — Abhinand Venugopal: unsplash.com/photos/a-man-driving-a-race-car-on-top-of-a-race-track-1WZfzLWBSi4
 const HERO_IMG =
   'https://images.unsplash.com/photo-1728116693268-125c5d6ad9e2?auto=format&fit=crop&w=1920&q=80'
 
@@ -28,7 +26,9 @@ export function HomeHero() {
             <div className="inline-block max-w-full">
               <h1 className="text-3xl font-extrabold tracking-tight text-white [text-shadow:0_5px_18px_rgba(0,0,0,0.95)] md:text-5xl lg:text-6xl">
                 Welkom bij{' '}
-                <span className="text-[#d50000] italic [text-shadow:0_4px_12px_rgba(0,0,0,0.88)]">Auto</span>
+                <span className="text-[#d50000] italic [text-shadow:0_4px_12px_rgba(0,0,0,0.88)]">
+                  Auto
+                </span>
                 <span className="text-white italic">Dash</span>
               </h1>
               <p className="mt-2 max-w-xl text-base font-medium leading-relaxed text-white [text-shadow:0_3px_10px_rgba(0,0,0,0.92)] md:text-xl">
@@ -42,192 +42,18 @@ export function HomeHero() {
   )
 }
 
-// ── Statische nationaliteitsmap 2026 F1-rijders ────────────────────────────
-// OpenF1 levert country_code=null voor alle rijders; bevestigd via session 11253 (Suzuka 2026).
-// ISO 3166-1 alpha-2 (kleine letters) voor flagcdn.com.
-const DRIVER_NATIONALITIES = {
-  1:  'nl', // Max Verstappen / kampioenschapsnummer (huidige seizoen-data)
-  3:  'nl', // Max Verstappen    (Red Bull)
-  4:  'gb', // Lando Norris
-  5:  'br', // Gabriel Bortoleto (Audi)
-  6:  'fr', // Isack Hadjar      (Red Bull)
-  10: 'fr', // Pierre Gasly      (Alpine)
-  11: 'mx', // Sergio Perez      (Cadillac)
-  12: 'it', // Kimi Antonelli    (Mercedes)
-  14: 'es', // Fernando Alonso   (Aston Martin)
-  16: 'mc', // Charles Leclerc   (Ferrari)
-  18: 'ca', // Lance Stroll      (Aston Martin)
-  23: 'th', // Alexander Albon   (Williams)
-  27: 'de', // Nico Hülkenberg   (Audi)
-  30: 'nz', // Liam Lawson       (Racing Bulls)
-  31: 'fr', // Esteban Ocon      (Haas)
-  41: 'gb', // Arvid Lindblad    (Racing Bulls)
-  43: 'ar', // Franco Colapinto  (Alpine)
-  44: 'gb', // Lewis Hamilton    (Ferrari)
-  55: 'es', // Carlos Sainz      (Williams)
-  63: 'gb', // George Russell    (Mercedes)
-  77: 'fi', // Valtteri Bottas   (Cadillac)
-  81: 'au', // Oscar Piastri     (McLaren)
-  87: 'gb', // Oliver Bearman    (Haas)
-}
-
-function driverFlag(driverNumber) {
-  const code = DRIVER_NATIONALITIES[driverNumber]
-  return code ? `https://flagcdn.com/w40/${code}.png` : ''
-}
-
-// ── Hardcoded circuit-coördinaten (fallback voor geocoding) ───────────────
-const CIRCUIT_COORDS = {
-  Sakhir:               { latitude: 26.0325,  longitude: 50.5106   },
-  Jeddah:               { latitude: 21.6319,  longitude: 39.1044   },
-  Melbourne:            { latitude: -37.8497, longitude: 144.968   },
-  Suzuka:               { latitude: 34.8431,  longitude: 136.541   },
-  Shanghai:             { latitude: 31.3389,  longitude: 121.2197  },
-  Miami:                { latitude: 25.9581,  longitude: -80.2389  },
-  Imola:                { latitude: 44.3439,  longitude: 11.7167   },
-  'Monte Carlo':        { latitude: 43.7347,  longitude: 7.4206    },
-  Catalunya:            { latitude: 41.57,    longitude: 2.2611    },
-  Montreal:             { latitude: 45.5006,  longitude: -73.5228  },
-  Spielberg:            { latitude: 47.2197,  longitude: 14.7647   },
-  Silverstone:          { latitude: 52.0786,  longitude: -1.0169   },
-  Hungaroring:          { latitude: 47.5789,  longitude: 19.2486   },
-  'Spa-Francorchamps':  { latitude: 50.4372,  longitude: 5.9714    },
-  Zandvoort:            { latitude: 52.3888,  longitude: 4.5409    },
-  Monza:                { latitude: 45.6156,  longitude: 9.2811    },
-  Baku:                 { latitude: 40.3725,  longitude: 49.8533   },
-  Singapore:            { latitude: 1.2914,   longitude: 103.8644  },
-  Austin:               { latitude: 30.1328,  longitude: -97.6411  },
-  'Mexico City':        { latitude: 19.4042,  longitude: -99.0907  },
-  Interlagos:           { latitude: -23.7036, longitude: -46.6997  },
-  'Las Vegas':          { latitude: 36.1147,  longitude: -115.1728 },
-  Lusail:               { latitude: 25.49,    longitude: 51.4542   },
-  'Yas Marina Circuit': { latitude: 24.4672,  longitude: 54.6031   },
-  Madring:              { latitude: 40.4534,  longitude: -3.6883   },
-}
-
-// ── localStorage-cache helpers ────────────────────────────────────────────
-const CACHE_KEY_PREFIX = 'autodash_cache_v3'
-const CACHE_MAX_AGE_MS = 60 * 60 * 1000 // 60 minuten
-const UNSPLASH_BG_CACHE_KEY = 'autodash_unsplash_bg_v1'
-const UNSPLASH_BG_TTL_MS = 60 * 60 * 1000 // 60 minuten
-const UNSPLASH_UTM = 'utm_source=autodash&utm_medium=referral'
-const OPENF1_POLL_MS = 30 * 60 * 1000 // 30 minuten
-const INITIAL_LOADING_MAX_WAIT_MS = 2200
-const API_RETRY_ATTEMPTS = 2
-const API_RETRY_BASE_DELAY_MS = 600
-
-function resolveCacheNamespace() {
-  try {
-    const possibleKeys = ['autodash_user', 'currentUser', 'authUser', 'user', 'profile']
-    for (const key of possibleKeys) {
-      const raw = localStorage.getItem(key)
-      if (!raw) continue
-      try {
-        const parsed = JSON.parse(raw)
-        const candidate =
-          parsed?.id || parsed?.userId || parsed?.uid || parsed?.email || parsed?.username
-        if (candidate) return String(candidate).toLowerCase()
-      } catch {
-        return String(raw).toLowerCase()
-      }
-    }
-  } catch {
-    // localStorage niet toegankelijk
-  }
-  return 'guest'
-}
-
-function getCacheKey() {
-  return `${CACHE_KEY_PREFIX}_${resolveCacheNamespace()}`
-}
-
-function readCache(cacheKey) {
-  try {
-    const raw = localStorage.getItem(cacheKey)
-    if (!raw) return null
-    const cache = JSON.parse(raw)
-    if (!cache.savedAt || Date.now() - cache.savedAt > CACHE_MAX_AGE_MS) return null
-    return cache
-  } catch {
-    return null
-  }
-}
-
-function writeCache(cacheKey, partial) {
-  try {
-    const existing = readCache(cacheKey) || {}
-    localStorage.setItem(
-      cacheKey,
-      JSON.stringify({ ...existing, ...partial, savedAt: Date.now() })
-    )
-  } catch {
-    // localStorage vol of niet beschikbaar
-  }
-}
-
-function readUnsplashCache() {
-  try {
-    const raw = localStorage.getItem(UNSPLASH_BG_CACHE_KEY)
-    if (!raw) return null
-    const parsed = JSON.parse(raw)
-    if (!parsed.savedAt || Date.now() - parsed.savedAt > UNSPLASH_BG_TTL_MS) return null
-    if (!Array.isArray(parsed.photos) || parsed.photos.length !== 5) return null
-    return parsed.photos
-  } catch {
-    return null
-  }
-}
-
-function writeUnsplashCache(photos) {
-  try {
-    localStorage.setItem(
-      UNSPLASH_BG_CACHE_KEY,
-      JSON.stringify({ photos, savedAt: Date.now() })
-    )
-  } catch {
-    // localStorage vol of niet beschikbaar
-  }
-}
-
-// ── Component ─────────────────────────────────────────────────────────────
 export default function Home() {
-  const cacheKeyRef = useRef(getCacheKey())
-  const cacheKey = cacheKeyRef.current
-  const cached = readCache(cacheKey)
-  const currentSeasonYear = new Date().getFullYear()
-  const canUseLegacySeasonStatsCache =
-    !cached?.seasonStatsYear &&
-    Array.isArray(cached?.seasonStats) &&
-    cached.seasonStats.length > 0 &&
-    Number(cached?.nextRace?.year) === currentSeasonYear
-  const buildWidgetState = (data, emptyValue, updatedAt) => {
-    const normalizedData = data ?? emptyValue
-    const hasData = Array.isArray(normalizedData)
-      ? normalizedData.length > 0
-      : Boolean(normalizedData)
-    return {
-      loading: !hasData,
-      error: '',
-      data: normalizedData,
-      stale: false,
-      lastUpdated: hasData ? updatedAt || null : null,
-    }
-  }
-  // State initialiseren vanuit cache zodat data direct zichtbaar is na page refresh
-  const [nextRace, setNextRace] = useState(() => buildWidgetState(cached?.nextRace, null, cached?.nextRaceUpdatedAt))
-  const [weather, setWeather] = useState(() => buildWidgetState(cached?.weather, null, cached?.weatherUpdatedAt))
-  const [drivers, setDrivers] = useState(() => buildWidgetState(cached?.drivers, [], cached?.driversUpdatedAt))
-  const [seasonStats, setSeasonStats] = useState(() =>
-    buildWidgetState(
-      cached?.seasonStatsYear === currentSeasonYear || canUseLegacySeasonStatsCache
-        ? cached?.seasonStats
-        : [],
-      [],
-      cached?.seasonStatsYear === currentSeasonYear || canUseLegacySeasonStatsCache
-        ? cached?.seasonStatsUpdatedAt
-        : null
-    )
-  )
+  const {
+    nextRace,
+    weather,
+    drivers,
+    seasonStats,
+    bgPhotos,
+    fallbackPhotos,
+    initialLoading,
+    refreshing,
+  } = useDashboardData()
+
   const [myLaps] = useState(() => {
     const raw = localStorage.getItem('lapTimes')
     if (!raw) return []
@@ -238,573 +64,7 @@ export default function Home() {
       return []
     }
   })
-  const [bgPhotos, setBgPhotos] = useState([])
-  // Toon initial spinner alleen als er geen cache is
-  const [initialLoading, setInitialLoading] = useState(() => !cached)
-  const [refreshing, setRefreshing] = useState(false)
 
-  const didLoadOnceRef = useRef(!!cached)
-  const requestRunningRef = useRef(false)
-  const refreshDelayRef = useRef(30000)
-  const refreshFailureStreakRef = useRef(0)
-  const weatherFailureStreakRef = useRef(0)
-  const weatherRetryAfterRef = useRef(0)
-  const latestRaceDataRef = useRef(cached?.nextRace ?? null)
-  const latestCompletedRaceSessionKeyRef = useRef(null)
-  const lastOpenF1FetchAtRef = useRef(
-    Math.max(
-      Number(cached?.nextRaceUpdatedAt || 0),
-      Number(cached?.driversUpdatedAt || 0),
-      Number(cached?.seasonStatsUpdatedAt || 0)
-    )
-  )
-
-  const WEATHER_POLL_MS = 30000
-  const WEATHER_RETRY_BASE_MS = 2 * 60 * 1000
-  const WEATHER_RETRY_MAX_MS = 30 * 60 * 1000
-
-  const openF1Base   = import.meta.env.VITE_OPENF1_URL     || 'https://api.openf1.org/v1'
-  const openMeteoUrl = import.meta.env.VITE_OPEN_METEO_URL || 'https://api.open-meteo.com/v1/forecast'
-  const unsplashApiUrl    = import.meta.env.VITE_UNSPLASH_API_URL || 'https://api.unsplash.com'
-  const unsplashAccessKey = import.meta.env.VITE_UNSPLASH_ACCESS_KEY
-
-  const fallbackPhotos = useMemo(
-    () => [
-      {
-        url: '/placeholders/ph1.jpg',
-        photographerName: 'F1 Unleashed',
-        profileUrl: `https://unsplash.com/@f1unleashed?${UNSPLASH_UTM}`,
-        unsplashUrl: `https://unsplash.com/photos/4oAq0VOYl9A?${UNSPLASH_UTM}`,
-      },
-      {
-        url: '/placeholders/ph2.jpg',
-        photographerName: 'Jack B',
-        profileUrl: `https://unsplash.com/@nervum?${UNSPLASH_UTM}`,
-        unsplashUrl: `https://unsplash.com/photos/EwUZ8hjWXSk?${UNSPLASH_UTM}`,
-      },
-      {
-        url: '/placeholders/ph3.jpg',
-        photographerName: 'Ank Kumar',
-        profileUrl: `https://unsplash.com/@ankkumar?${UNSPLASH_UTM}`,
-        unsplashUrl: `https://unsplash.com/photos/tGghQBM-RVo?${UNSPLASH_UTM}`,
-      },
-      {
-        url: '/placeholders/ph4.jpg',
-        photographerName: 'F1 Unleashed',
-        profileUrl: `https://unsplash.com/@f1unleashed?${UNSPLASH_UTM}`,
-        unsplashUrl: `https://unsplash.com/photos/J0PLcahCOVk?${UNSPLASH_UTM}`,
-      },
-      {
-        url: '/placeholders/ph5.jpg',
-        photographerName: 'Mr. AN',
-        profileUrl: `https://unsplash.com/@mran123?${UNSPLASH_UTM}`,
-        unsplashUrl: `https://unsplash.com/photos/IFFPJpbF4CM?${UNSPLASH_UTM}`,
-      },
-    ],
-    []
-  )
-
-  const openF1Client = useMemo(
-    () => axios.create({ baseURL: openF1Base, timeout: 9000 }),
-    [openF1Base]
-  )
-  const openMeteoClient = useMemo(() => axios.create({ timeout: 7000 }), [])
-  const geocodingClient = useMemo(() => axios.create({ timeout: 5000 }), [])
-
-  async function requestJson(client, url, signal) {
-    try {
-      const res = await client.get(url, { signal })
-      return res.data
-    } catch (error) {
-      const status = error?.response?.status ?? 'unknown'
-      const wrapped = new Error(`API request failed (${status}) for ${url}`, { cause: error })
-      wrapped.status = status
-      wrapped.code = error?.code ?? null
-      wrapped.isAbort = signal?.aborted || error?.code === 'ERR_CANCELED'
-      wrapped.isNetworkError = !error?.response
-      throw wrapped
-    }
-  }
-
-  function shouldRetryApiError(error) {
-    if (error?.isAbort) return false
-    const status = Number(error?.status)
-    return (
-      error?.isNetworkError ||
-      error?.status === 'unknown' ||
-      status === 429 ||
-      status === 500 ||
-      status === 502 ||
-      status === 503 ||
-      status === 504
-    )
-  }
-
-  async function waitForRetry(delayMs, signal) {
-    if (delayMs <= 0) return
-    await new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
-        signal?.removeEventListener('abort', onAbort)
-        resolve()
-      }, delayMs)
-      function onAbort() {
-        clearTimeout(timer)
-        reject(new Error('Retry aborted'))
-      }
-      if (signal) signal.addEventListener('abort', onAbort, { once: true })
-    })
-  }
-
-  async function requestJsonWithRetry(client, url, signal, retries = API_RETRY_ATTEMPTS) {
-    let attempt = 0
-    while (attempt <= retries) {
-      try {
-        return await requestJson(client, url, signal)
-      } catch (error) {
-        const canRetry = shouldRetryApiError(error) && attempt < retries
-        if (!canRetry) throw error
-        const delay = API_RETRY_BASE_DELAY_MS * (2 ** attempt)
-        await waitForRetry(delay, signal)
-      }
-      attempt += 1
-    }
-    throw new Error(`Retry exhaustion for ${url}`)
-  }
-
-  useEffect(() => {
-    let refreshTimer = null
-    let currentController = null
-    const initialLoadingGuardTimer = setTimeout(() => {
-      setInitialLoading(false)
-      didLoadOnceRef.current = true
-    }, INITIAL_LOADING_MAX_WAIT_MS)
-
-    function scheduleNextPoll() {
-      if (refreshTimer) clearTimeout(refreshTimer)
-      refreshTimer = setTimeout(loadDashboardData, refreshDelayRef.current)
-    }
-
-    async function loadDashboardData() {
-      if (requestRunningRef.current) return
-      requestRunningRef.current = true
-      setRefreshing(true)
-      currentController = new AbortController()
-      const signal = currentController.signal
-      const year = new Date().getFullYear()
-      const now = new Date()
-      const nowTs = Date.now()
-      const hasDriversData = drivers.data.length > 0
-      const hasSeasonStatsData = seasonStats.data.length > 0
-      const shouldFetchWeather = nowTs >= weatherRetryAfterRef.current
-      const shouldFetchOpenF1 =
-        !hasDriversData ||
-        !hasSeasonStatsData ||
-        !lastOpenF1FetchAtRef.current ||
-        nowTs - lastOpenF1FetchAtRef.current >= OPENF1_POLL_MS ||
-        !latestRaceDataRef.current
-      let raceData = latestRaceDataRef.current
-      let latestCompletedRaceSessionKey = latestCompletedRaceSessionKeyRef.current
-      const cacheUpdate = {}
-      let hadApiFailure = false
-
-      if (shouldFetchOpenF1) {
-        setNextRace((prev) => ({ ...prev, loading: !prev.data, error: '' }))
-      }
-      if (shouldFetchWeather) {
-        setWeather((prev) => ({ ...prev, loading: !prev.data, error: '' }))
-      }
-      if (shouldFetchOpenF1) {
-        setDrivers((prev) => ({ ...prev, loading: prev.data.length === 0 && !prev.error, error: '' }))
-        setSeasonStats((prev) => ({ ...prev, loading: prev.data.length === 0 && !prev.error, error: '' }))
-      }
-
-      try {
-        if (shouldFetchOpenF1) {
-          // ── OpenF1 fetch (minder vaak dan weer) ───────────────────────────
-          let currentYearMeetings = []
-          let currentYearRaceSessions = []
-          try {
-            currentYearMeetings = await requestJsonWithRetry(
-              openF1Client,
-              `/meetings?year=${year}`,
-              signal
-            )
-          } catch {
-            hadApiFailure = true
-          }
-          try {
-            currentYearRaceSessions = await requestJsonWithRetry(
-              openF1Client,
-              `/sessions?session_name=Race&year=${year}`,
-              signal
-            )
-          } catch {
-            hadApiFailure = true
-          }
-
-          const allMeetings = [...currentYearMeetings]
-          let nextYearMeetings = []
-          if (currentYearMeetings.length > 0) {
-            const hasUpcomingCurrentYearRace = currentYearMeetings.some(
-              (m) =>
-                !m.is_cancelled &&
-                m.meeting_name.toLowerCase().includes('grand prix') &&
-                new Date(m.date_start) > now
-            )
-            if (!hasUpcomingCurrentYearRace) {
-              try {
-                nextYearMeetings = await requestJsonWithRetry(
-                  openF1Client,
-                  `/meetings?year=${year + 1}`,
-                  signal
-                )
-              } catch {
-                hadApiFailure = true
-              }
-            }
-          }
-          allMeetings.push(...nextYearMeetings)
-          if (currentYearMeetings.length === 0 && nextYearMeetings.length === 0) {
-            hadApiFailure = true
-          }
-          if (currentYearRaceSessions.length === 0) {
-            hadApiFailure = true
-          }
-
-          const latestCurrentYearRaceSession = currentYearRaceSessions
-            .filter((s) => s.date_end && new Date(s.date_end) <= now && !s.is_cancelled)
-            .sort((a, b) => new Date(b.date_end) - new Date(a.date_end))[0]
-
-          // Alleen actuele seizoensdata gebruiken: geen fallback naar vorig jaar.
-          latestCompletedRaceSessionKey = latestCurrentYearRaceSession?.session_key || null
-          latestCompletedRaceSessionKeyRef.current = latestCompletedRaceSessionKey
-
-          // ── Volgende race ──────────────────────────────────────────────────
-          try {
-            const upcomingRace =
-              allMeetings
-                .filter(
-                  (m) =>
-                    !m.is_cancelled &&
-                    m.meeting_name.toLowerCase().includes('grand prix') &&
-                    new Date(m.date_start) > now
-                )
-                .sort((a, b) => new Date(a.date_start) - new Date(b.date_start))[0] || null
-
-            if (!upcomingRace) throw new Error('Geen komende Grand Prix gevonden.')
-
-            raceData = {
-              ...upcomingRace,
-              countryName: upcomingRace.country_name || 'Land onbekend',
-              countryFlag: upcomingRace.country_flag || '',
-              circuitName: upcomingRace.circuit_short_name || upcomingRace.location || 'Circuit onbekend',
-              circuitImage: upcomingRace.circuit_image || null,
-            }
-
-            const raceNowTs = Date.now()
-            setNextRace({ loading: false, error: '', data: raceData, stale: false, lastUpdated: raceNowTs })
-            cacheUpdate.nextRace = raceData
-            cacheUpdate.nextRaceUpdatedAt = raceNowTs
-            latestRaceDataRef.current = raceData
-          } catch (error) {
-            hadApiFailure = true
-            setNextRace((prev) =>
-              prev.data
-                ? { ...prev, loading: false, error: '', stale: true }
-                : {
-                    ...prev,
-                    loading: false,
-                    error: 'Geen komende Grand Prix gevonden.',
-                    stale: false,
-                  }
-            )
-          }
-        }
-
-        // ── Weer op circuit ────────────────────────────────────────────────
-        try {
-          if (!shouldFetchWeather) {
-            // Backoff actief na netwerkfout; behoud huidige data/status.
-          } else {
-            if (!raceData) throw new Error('Geen race-data beschikbaar voor weerlocatie.')
-
-            let coords = null
-
-            try {
-              const geoRes = await geocodingClient.get(
-                `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(raceData.location)}&count=1&language=en&format=json`,
-                { signal }
-              )
-              const hit = geoRes.data?.results?.[0]
-              if (Number.isFinite(hit?.latitude) && Number.isFinite(hit?.longitude)) {
-                coords = { latitude: hit.latitude, longitude: hit.longitude }
-              }
-            } catch {
-              // Geocoding mislukt → fallback map
-            }
-
-            if (!coords) coords = CIRCUIT_COORDS[raceData.circuit_short_name] || null
-            if (!coords) throw new Error('Geen coördinaten beschikbaar voor dit circuit.')
-
-            const weatherData = await requestJsonWithRetry(
-              openMeteoClient,
-              `${openMeteoUrl}?latitude=${coords.latitude}&longitude=${coords.longitude}&current=temperature_2m,wind_speed_10m,precipitation&timezone=auto`,
-              signal
-            )
-
-            const nowTs = Date.now()
-            const weatherResult = { ...weatherData.current, raceCircuit: raceData.circuitName }
-            setWeather({ loading: false, error: '', data: weatherResult, stale: false, lastUpdated: nowTs })
-            cacheUpdate.weather = weatherResult
-            cacheUpdate.weatherUpdatedAt = nowTs
-            weatherFailureStreakRef.current = 0
-            weatherRetryAfterRef.current = 0
-          }
-        } catch (error) {
-          if (!error?.isAbort) {
-            const isMissingRaceData = String(error?.message || '').includes(
-              'Geen race-data beschikbaar voor weerlocatie.'
-            )
-            const isTransientWeatherFailure =
-              error?.isNetworkError ||
-              error?.status === 429 ||
-              error?.status === 503 ||
-              error?.status === 'unknown'
-            if (isMissingRaceData) {
-              weatherFailureStreakRef.current = 0
-              weatherRetryAfterRef.current = 0
-            } else if (isTransientWeatherFailure) {
-              weatherFailureStreakRef.current += 1
-              const retryDelay = Math.min(
-                WEATHER_RETRY_BASE_MS * (2 ** (weatherFailureStreakRef.current - 1)),
-                WEATHER_RETRY_MAX_MS
-              )
-              weatherRetryAfterRef.current = Date.now() + retryDelay
-            } else {
-              weatherFailureStreakRef.current = 0
-              weatherRetryAfterRef.current = 0
-            }
-            if (!isMissingRaceData) {
-              console.error('[Weather]', error)
-            }
-          }
-          hadApiFailure = true
-          setWeather((prev) =>
-            prev.data
-              ? { ...prev, loading: false, error: '', stale: true }
-              : { ...prev, loading: false, error: 'Weer tijdelijk niet beschikbaar.', stale: false }
-          )
-        }
-
-        // ── Coureurs lijst & Seizoen ranglijst (OpenF1, throttled) ─────────
-        if (shouldFetchOpenF1) {
-          try {
-            if (!latestCompletedRaceSessionKey) {
-              setDrivers((prev) =>
-                prev.data.length > 0
-                  ? { ...prev, loading: false, error: '', stale: true }
-                  : { ...prev, loading: false, error: 'Nog geen afgeronde races in dit seizoen.', stale: false }
-              )
-              setSeasonStats((prev) =>
-                prev.data.length > 0
-                  ? { ...prev, loading: false, error: '', stale: true }
-                  : { ...prev, loading: false, error: 'Nog geen afgeronde races in dit seizoen.', stale: false }
-              )
-              return
-            }
-
-            const sessionKey = latestCompletedRaceSessionKey
-
-            let driversData = null
-            let standingsData = null
-            try {
-              driversData = await requestJsonWithRetry(
-                openF1Client,
-                `/drivers?session_key=${sessionKey}`,
-                signal
-              )
-            } catch (error) {
-              console.error('[Drivers]', error)
-              hadApiFailure = true
-            }
-
-            try {
-              standingsData = await requestJsonWithRetry(
-                openF1Client,
-                `/championship_drivers?session_key=${latestCompletedRaceSessionKey}`,
-                signal
-              )
-            } catch (error) {
-              console.error('[Standings]', error)
-              hadApiFailure = true
-            }
-
-          if (driversData) {
-            const mappedDrivers = driversData
-              .map((d) => ({
-                name: `${d.first_name ?? ''} ${d.last_name ?? ''}`.trim() || d.broadcast_name || 'Onbekend',
-                number: d.driver_number ?? '-',
-                flag: driverFlag(d.driver_number),
-              }))
-              .sort((a, b) => Number(a.number) - Number(b.number))
-            const driversNowTs = Date.now()
-            setDrivers({ loading: false, error: '', data: mappedDrivers, stale: false, lastUpdated: driversNowTs })
-            cacheUpdate.drivers = mappedDrivers
-            cacheUpdate.driversUpdatedAt = driversNowTs
-          } else {
-            hadApiFailure = true
-            setDrivers((prev) =>
-              prev.data.length > 0
-                ? { ...prev, loading: false, error: '', stale: true }
-                : { ...prev, loading: false, error: 'Coureurs tijdelijk niet beschikbaar.', stale: false }
-            )
-          }
-
-          if (standingsData && driversData) {
-            const driverByNumber = new Map(
-              driversData.map((d) => [d.driver_number, d])
-            )
-            const mappedStandings = standingsData
-              .map((row) => {
-                const driver = driverByNumber.get(row.driver_number)
-                return {
-                  position: row.position_current ?? row.position_start ?? null,
-                  name: driver
-                    ? `${driver.first_name ?? ''} ${driver.last_name ?? ''}`.trim() || driver.broadcast_name
-                    : `#${row.driver_number}`,
-                  points: row.points_current ?? row.points_start ?? 0,
-                  flag: driverFlag(row.driver_number),
-                }
-              })
-              .filter((r) => r.position !== null)
-              .sort((a, b) => Number(a.position) - Number(b.position))
-
-            const standingsNowTs = Date.now()
-            setSeasonStats({
-              loading: false,
-              error: '',
-              data: mappedStandings,
-              stale: false,
-              lastUpdated: standingsNowTs,
-            })
-            cacheUpdate.seasonStats = mappedStandings
-            cacheUpdate.seasonStatsUpdatedAt = standingsNowTs
-            cacheUpdate.seasonStatsYear = year
-          } else {
-            hadApiFailure = true
-            setSeasonStats((prev) =>
-              prev.data.length > 0
-                ? { ...prev, loading: false, error: '', stale: true }
-                : { ...prev, loading: false, error: 'Geen actuele seizoensstand beschikbaar.', stale: false }
-            )
-          }
-          } catch (error) {
-            console.error('[Drivers/Standings]', error)
-            hadApiFailure = true
-            setSeasonStats((prev) =>
-              prev.data.length > 0
-                ? { ...prev, loading: false, error: '', stale: true }
-                : { ...prev, loading: false, error: 'Geen actuele seizoensstand beschikbaar.', stale: false }
-            )
-          } finally {
-            lastOpenF1FetchAtRef.current = Date.now()
-          }
-        }
-
-        // Cache bijwerken voor elk onderdeel dat succesvol was geladen
-        if (Object.keys(cacheUpdate).length > 0) {
-          writeCache(cacheKey, cacheUpdate)
-        }
-        if (hadApiFailure) {
-          refreshFailureStreakRef.current += 1
-          refreshDelayRef.current = Math.min(
-            10000 * (2 ** (refreshFailureStreakRef.current - 1)),
-            60000
-          )
-        } else {
-          refreshFailureStreakRef.current = 0
-          refreshDelayRef.current = WEATHER_POLL_MS
-        }
-      } catch (error) {
-        console.error('[DashboardLoad]', error)
-        refreshFailureStreakRef.current += 1
-        refreshDelayRef.current = Math.min(
-          10000 * (2 ** (refreshFailureStreakRef.current - 1)),
-          60000
-        )
-      } finally {
-        if (!didLoadOnceRef.current) {
-          didLoadOnceRef.current = true
-          setInitialLoading(false)
-        }
-        setRefreshing(false)
-        requestRunningRef.current = false
-        scheduleNextPoll()
-      }
-    }
-
-    loadDashboardData()
-    return () => {
-      clearTimeout(initialLoadingGuardTimer)
-      if (refreshTimer) clearTimeout(refreshTimer)
-      if (currentController) currentController.abort()
-      // Reset lock bij cleanup zodat React StrictMode remount correct werkt
-      requestRunningRef.current = false
-    }
-  }, [geocodingClient, openF1Client, openMeteoClient, openMeteoUrl])
-
-  // ── Unsplash achtergrondafbeeldingen ──────────────────────────────────────
-  useEffect(() => {
-    const controller = new AbortController()
-
-    async function loadUnsplashImages() {
-      const cachedPhotos = readUnsplashCache()
-      if (cachedPhotos) {
-        setBgPhotos(cachedPhotos)
-        return
-      }
-
-      if (!unsplashAccessKey) {
-        setBgPhotos(fallbackPhotos)
-        return
-      }
-
-      try {
-        const res = await fetch(
-          `${unsplashApiUrl}/photos/random?count=5&query=formula%201%20motorsport&orientation=landscape&content_filter=high`,
-          {
-            headers: { Authorization: `Client-ID ${unsplashAccessKey}` },
-            signal: controller.signal,
-          }
-        )
-        if (!res.ok) throw new Error('Unsplash niet beschikbaar.')
-        const data = await res.json()
-        const photos = Array.isArray(data) ? data : [data]
-        const mappedPhotos = photos
-          .map((p) => ({
-            url: p?.urls?.regular || '',
-            photographerName: p?.user?.name || 'Onbekend',
-            profileUrl: `${p?.user?.links?.html || 'https://unsplash.com'}?${UNSPLASH_UTM}`,
-            unsplashUrl: `${p?.links?.html || 'https://unsplash.com'}?${UNSPLASH_UTM}`,
-          }))
-          .filter((p) => p.url)
-          .slice(0, 5)
-        if (mappedPhotos.length === 5) {
-          setBgPhotos(mappedPhotos)
-          writeUnsplashCache(mappedPhotos)
-          return
-        }
-        setBgPhotos(fallbackPhotos)
-      } catch {
-        setBgPhotos(fallbackPhotos)
-      }
-    }
-
-    loadUnsplashImages()
-    return () => controller.abort()
-  }, [fallbackPhotos, unsplashAccessKey, unsplashApiUrl])
-
-  // ── Lap summary ───────────────────────────────────────────────────────────
   const lapSummary = useMemo(() => {
     if (!myLaps.length) return null
     const normalized = myLaps
@@ -821,12 +81,11 @@ export default function Home() {
       })
       .filter((lap) => lap.lapTime !== null)
     if (!normalized.length) return null
-    const bestLap   = normalized.reduce((best, lap) => lap.lapTime < best.lapTime ? lap : best)
+    const bestLap = normalized.reduce((best, lap) => (lap.lapTime < best.lapTime ? lap : best))
     const latestLap = normalized[normalized.length - 1]
     return { total: normalized.length, best: bestLap, latest: latestLap }
   }, [myLaps])
 
-  // ── Render helpers ────────────────────────────────────────────────────────
   const cardClass =
     'group relative overflow-hidden rounded-lg border border-slate-700/80 bg-slate-900/55 p-5 text-left shadow-lg shadow-black/25 transition-[transform,box-shadow,background-color,border-color] duration-300 ease-out hover:scale-[1.015] hover:border-slate-500/80 hover:bg-slate-900/70 hover:shadow-xl hover:shadow-black/45'
 
@@ -852,7 +111,6 @@ export default function Home() {
     return utcMidnight.toLocaleDateString('nl-NL', { timeZone: 'UTC' })
   }
 
-  // ── JSX ───────────────────────────────────────────────────────────────────
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-slate-950 text-slate-100">
       <section className="relative flex min-h-0 flex-1 flex-col justify-center px-6 py-10 md:px-10">
@@ -865,16 +123,13 @@ export default function Home() {
           <div className="mx-auto w-full max-w-6xl">
             <div className="grid items-stretch gap-6 lg:grid-cols-[2fr_1fr]">
               <div className="grid gap-6 sm:grid-cols-2">
-
-                {/* Volgende race */}
-                <Link
-                  to="/races"
-                  className={`${cardClass} min-h-44 cursor-pointer`}
-                >
+                <Link to="/races" className={`${cardClass} min-h-44 cursor-pointer`}>
                   {renderCardBackground(0, nextRace.data?.circuitImage)}
                   <div className="relative z-10">
                     <span className="mb-3 block h-0.5 w-14 rounded-full bg-red-500/70" />
-                    <h2 className="border-l-2 border-red-500/70 pl-2 text-sm font-semibold">Volgende race</h2>
+                    <h2 className="border-l-2 border-red-500/70 pl-2 text-sm font-semibold">
+                      Volgende race
+                    </h2>
                     {nextRace.loading && !nextRace.data && (
                       <div className="mt-3.5 flex min-h-[7rem] items-center justify-center">
                         <LoadingSpinner compact message="" />
@@ -907,14 +162,20 @@ export default function Home() {
                         </p>
                       </div>
                     )}
+                    {!nextRace.loading && !nextRace.data && nextRace.error && (
+                      <p className="mt-3 text-sm text-slate-300">
+                        {nextRace.error}
+                      </p>
+                    )}
+                    {!nextRace.loading && !nextRace.data && !nextRace.error && (
+                      <p className="mt-3 text-sm text-slate-300">
+                        Race data tijdelijk niet beschikbaar.
+                      </p>
+                    )}
                   </div>
                 </Link>
 
-                {/* Weer op circuit */}
-                <Link
-                  to="/weather"
-                  className={`${cardClass} min-h-44 cursor-pointer`}
-                >
+                <Link to="/weather" className={`${cardClass} min-h-44 cursor-pointer`}>
                   {renderCardBackground(1)}
                   <div className="relative z-10">
                     <h2 className="text-sm font-semibold">Weer op circuit</h2>
@@ -935,14 +196,20 @@ export default function Home() {
                         </p>
                       </div>
                     )}
+                    {!weather.loading && !weather.data && weather.error && (
+                      <p className="mt-3 text-sm text-slate-300">
+                        {weather.error}
+                      </p>
+                    )}
+                    {!weather.loading && !weather.data && !weather.error && (
+                      <p className="mt-3 text-sm text-slate-300">
+                        Weer data tijdelijk niet beschikbaar.
+                      </p>
+                    )}
                   </div>
                 </Link>
 
-                {/* Coureurs lijst */}
-                <Link
-                  to="/standings"
-                  className={`${cardClass} min-h-44 cursor-pointer`}
-                >
+                <Link to="/standings" className={`${cardClass} min-h-44 cursor-pointer`}>
                   {renderCardBackground(2)}
                   <div className="relative z-10">
                     <h2 className="text-sm font-semibold">Coureurs lijst</h2>
@@ -968,7 +235,9 @@ export default function Home() {
                             ) : (
                               <span className="h-3 w-5 rounded-sm bg-slate-500/50" />
                             )}
-                            <span className="truncate">#{driver.number} {driver.name}</span>
+                            <span className="truncate">
+                              #{driver.number} {driver.name}
+                            </span>
                           </li>
                         ))}
                       </ul>
@@ -981,11 +250,7 @@ export default function Home() {
                   </div>
                 </Link>
 
-                {/* Seizoen ranglijst */}
-                <Link
-                  to="/standings"
-                  className={`${cardClass} min-h-44 cursor-pointer`}
-                >
+                <Link to="/standings" className={`${cardClass} min-h-44 cursor-pointer`}>
                   {renderCardBackground(3)}
                   <div className="relative z-10">
                     <div className="flex items-center justify-between gap-2">
@@ -1034,10 +299,8 @@ export default function Home() {
                     )}
                   </div>
                 </Link>
-
               </div>
 
-              {/* Mijn rondetijden */}
               <Link
                 to="/lap-tracker"
                 className={`${cardClass} min-h-[356px] cursor-pointer border-red-500/45 bg-slate-900/75 shadow-[0_0_0_1px_rgba(239,68,68,0.22),0_12px_30px_rgba(2,6,23,0.55)] hover:border-red-400/65 hover:shadow-[0_0_0_1px_rgba(239,68,68,0.35),0_18px_38px_rgba(2,6,23,0.68)] lg:h-full`}
@@ -1045,7 +308,9 @@ export default function Home() {
                 {renderCardBackground(4)}
                 <div className="relative z-10 flex h-full min-h-[356px] flex-col">
                   <span className="mb-3 block h-0.5 w-20 rounded-full bg-red-500/75" />
-                  <h2 className="border-l-2 border-red-500/75 pl-2 text-base font-semibold text-white">Mijn rondetijden</h2>
+                  <h2 className="border-l-2 border-red-500/75 pl-2 text-base font-semibold text-white">
+                    Mijn rondetijden
+                  </h2>
                   {!lapSummary && (
                     <div className="flex flex-1 items-center justify-center">
                       <div className="rounded-lg border border-red-600/95 bg-red-950/50 p-5 text-center ring-1 ring-red-500/45 shadow-[0_0_18px_rgba(220,38,38,0.35)]">
@@ -1072,7 +337,6 @@ export default function Home() {
                   )}
                 </div>
               </Link>
-
             </div>
           </div>
         )}
