@@ -113,6 +113,8 @@ const UNSPLASH_BG_TTL_MS = 60 * 60 * 1000 // 60 minuten
 const UNSPLASH_UTM = 'utm_source=autodash&utm_medium=referral'
 const OPENF1_POLL_MS = 30 * 60 * 1000 // 30 minuten
 const INITIAL_LOADING_MAX_WAIT_MS = 2200
+const API_RETRY_ATTEMPTS = 2
+const API_RETRY_BASE_DELAY_MS = 600
 
 function resolveCacheNamespace() {
   try {
@@ -324,6 +326,51 @@ export default function Home() {
     }
   }
 
+  function shouldRetryApiError(error) {
+    if (error?.isAbort) return false
+    const status = Number(error?.status)
+    return (
+      error?.isNetworkError ||
+      error?.status === 'unknown' ||
+      status === 429 ||
+      status === 500 ||
+      status === 502 ||
+      status === 503 ||
+      status === 504
+    )
+  }
+
+  async function waitForRetry(delayMs, signal) {
+    if (delayMs <= 0) return
+    await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        signal?.removeEventListener('abort', onAbort)
+        resolve()
+      }, delayMs)
+      function onAbort() {
+        clearTimeout(timer)
+        reject(new Error('Retry aborted'))
+      }
+      if (signal) signal.addEventListener('abort', onAbort, { once: true })
+    })
+  }
+
+  async function requestJsonWithRetry(client, url, signal, retries = API_RETRY_ATTEMPTS) {
+    let attempt = 0
+    while (attempt <= retries) {
+      try {
+        return await requestJson(client, url, signal)
+      } catch (error) {
+        const canRetry = shouldRetryApiError(error) && attempt < retries
+        if (!canRetry) throw error
+        const delay = API_RETRY_BASE_DELAY_MS * (2 ** attempt)
+        await waitForRetry(delay, signal)
+      }
+      attempt += 1
+    }
+    throw new Error(`Retry exhaustion for ${url}`)
+  }
+
   useEffect(() => {
     let refreshTimer = null
     let currentController = null
@@ -334,7 +381,7 @@ export default function Home() {
 
     function scheduleNextPoll() {
       if (refreshTimer) clearTimeout(refreshTimer)
-      refreshTimer = setTimeout(loadDashboardData, WEATHER_POLL_MS)
+      refreshTimer = setTimeout(loadDashboardData, refreshDelayRef.current)
     }
 
     async function loadDashboardData() {
@@ -374,17 +421,31 @@ export default function Home() {
       try {
         if (shouldFetchOpenF1) {
           // ── OpenF1 fetch (minder vaak dan weer) ───────────────────────────
-          const [currentYearMeetingsRes, currentYearRaceSessionsRes] = await Promise.allSettled([
-            requestJson(openF1Client, `/meetings?year=${year}`, signal),
-            requestJson(openF1Client, `/sessions?session_name=Race&year=${year}`, signal),
-          ])
+          let currentYearMeetings = []
+          let currentYearRaceSessions = []
+          try {
+            currentYearMeetings = await requestJsonWithRetry(
+              openF1Client,
+              `/meetings?year=${year}`,
+              signal
+            )
+          } catch {
+            hadApiFailure = true
+          }
+          try {
+            currentYearRaceSessions = await requestJsonWithRetry(
+              openF1Client,
+              `/sessions?session_name=Race&year=${year}`,
+              signal
+            )
+          } catch {
+            hadApiFailure = true
+          }
 
-          const allMeetings = [
-            ...(currentYearMeetingsRes.status === 'fulfilled' ? currentYearMeetingsRes.value : []),
-          ]
+          const allMeetings = [...currentYearMeetings]
           let nextYearMeetings = []
-          if (currentYearMeetingsRes.status === 'fulfilled') {
-            const hasUpcomingCurrentYearRace = currentYearMeetingsRes.value.some(
+          if (currentYearMeetings.length > 0) {
+            const hasUpcomingCurrentYearRace = currentYearMeetings.some(
               (m) =>
                 !m.is_cancelled &&
                 m.meeting_name.toLowerCase().includes('grand prix') &&
@@ -392,19 +453,21 @@ export default function Home() {
             )
             if (!hasUpcomingCurrentYearRace) {
               try {
-                nextYearMeetings = await requestJson(openF1Client, `/meetings?year=${year + 1}`, signal)
+                nextYearMeetings = await requestJsonWithRetry(
+                  openF1Client,
+                  `/meetings?year=${year + 1}`,
+                  signal
+                )
               } catch {
                 hadApiFailure = true
               }
             }
           }
           allMeetings.push(...nextYearMeetings)
-          const currentYearRaceSessions =
-            currentYearRaceSessionsRes.status === 'fulfilled' ? currentYearRaceSessionsRes.value : []
-          if (currentYearMeetingsRes.status !== 'fulfilled' && nextYearMeetings.length === 0) {
+          if (currentYearMeetings.length === 0 && nextYearMeetings.length === 0) {
             hadApiFailure = true
           }
-          if (currentYearRaceSessionsRes.status !== 'fulfilled') {
+          if (currentYearRaceSessions.length === 0) {
             hadApiFailure = true
           }
 
@@ -444,7 +507,6 @@ export default function Home() {
             cacheUpdate.nextRaceUpdatedAt = raceNowTs
             latestRaceDataRef.current = raceData
           } catch (error) {
-            console.error('[NextRace]', error)
             hadApiFailure = true
             setNextRace((prev) =>
               prev.data
@@ -484,7 +546,7 @@ export default function Home() {
             if (!coords) coords = CIRCUIT_COORDS[raceData.circuit_short_name] || null
             if (!coords) throw new Error('Geen coördinaten beschikbaar voor dit circuit.')
 
-            const weatherData = await requestJson(
+            const weatherData = await requestJsonWithRetry(
               openMeteoClient,
               `${openMeteoUrl}?latitude=${coords.latitude}&longitude=${coords.longitude}&current=temperature_2m,wind_speed_10m,precipitation&timezone=auto`,
               signal
@@ -500,12 +562,18 @@ export default function Home() {
           }
         } catch (error) {
           if (!error?.isAbort) {
+            const isMissingRaceData = String(error?.message || '').includes(
+              'Geen race-data beschikbaar voor weerlocatie.'
+            )
             const isTransientWeatherFailure =
               error?.isNetworkError ||
               error?.status === 429 ||
               error?.status === 503 ||
               error?.status === 'unknown'
-            if (isTransientWeatherFailure) {
+            if (isMissingRaceData) {
+              weatherFailureStreakRef.current = 0
+              weatherRetryAfterRef.current = 0
+            } else if (isTransientWeatherFailure) {
               weatherFailureStreakRef.current += 1
               const retryDelay = Math.min(
                 WEATHER_RETRY_BASE_MS * (2 ** (weatherFailureStreakRef.current - 1)),
@@ -516,7 +584,9 @@ export default function Home() {
               weatherFailureStreakRef.current = 0
               weatherRetryAfterRef.current = 0
             }
-            console.error('[Weather]', error)
+            if (!isMissingRaceData) {
+              console.error('[Weather]', error)
+            }
           }
           hadApiFailure = true
           setWeather((prev) =>
@@ -545,13 +615,32 @@ export default function Home() {
 
             const sessionKey = latestCompletedRaceSessionKey
 
-            const [driversRes, standingsRes] = await Promise.allSettled([
-              requestJson(openF1Client, `/drivers?session_key=${sessionKey}`, signal),
-              requestJson(openF1Client, `/championship_drivers?session_key=${latestCompletedRaceSessionKey}`, signal),
-            ])
+            let driversData = null
+            let standingsData = null
+            try {
+              driversData = await requestJsonWithRetry(
+                openF1Client,
+                `/drivers?session_key=${sessionKey}`,
+                signal
+              )
+            } catch (error) {
+              console.error('[Drivers]', error)
+              hadApiFailure = true
+            }
 
-          if (driversRes.status === 'fulfilled') {
-            const mappedDrivers = driversRes.value
+            try {
+              standingsData = await requestJsonWithRetry(
+                openF1Client,
+                `/championship_drivers?session_key=${latestCompletedRaceSessionKey}`,
+                signal
+              )
+            } catch (error) {
+              console.error('[Standings]', error)
+              hadApiFailure = true
+            }
+
+          if (driversData) {
+            const mappedDrivers = driversData
               .map((d) => ({
                 name: `${d.first_name ?? ''} ${d.last_name ?? ''}`.trim() || d.broadcast_name || 'Onbekend',
                 number: d.driver_number ?? '-',
@@ -563,7 +652,6 @@ export default function Home() {
             cacheUpdate.drivers = mappedDrivers
             cacheUpdate.driversUpdatedAt = driversNowTs
           } else {
-            console.error('[Drivers]', driversRes.reason)
             hadApiFailure = true
             setDrivers((prev) =>
               prev.data.length > 0
@@ -572,11 +660,11 @@ export default function Home() {
             )
           }
 
-          if (standingsRes.status === 'fulfilled' && driversRes.status === 'fulfilled') {
+          if (standingsData && driversData) {
             const driverByNumber = new Map(
-              driversRes.value.map((d) => [d.driver_number, d])
+              driversData.map((d) => [d.driver_number, d])
             )
-            const mappedStandings = standingsRes.value
+            const mappedStandings = standingsData
               .map((row) => {
                 const driver = driverByNumber.get(row.driver_number)
                 return {
@@ -603,7 +691,6 @@ export default function Home() {
             cacheUpdate.seasonStatsUpdatedAt = standingsNowTs
             cacheUpdate.seasonStatsYear = year
           } else {
-            console.error('[Standings]', standingsRes.reason)
             hadApiFailure = true
             setSeasonStats((prev) =>
               prev.data.length > 0
@@ -628,17 +715,28 @@ export default function Home() {
         if (Object.keys(cacheUpdate).length > 0) {
           writeCache(cacheKey, cacheUpdate)
         }
-        if (hadApiFailure) refreshFailureStreakRef.current += 1
-        else refreshFailureStreakRef.current = 0
+        if (hadApiFailure) {
+          refreshFailureStreakRef.current += 1
+          refreshDelayRef.current = Math.min(
+            10000 * (2 ** (refreshFailureStreakRef.current - 1)),
+            60000
+          )
+        } else {
+          refreshFailureStreakRef.current = 0
+          refreshDelayRef.current = WEATHER_POLL_MS
+        }
       } catch (error) {
         console.error('[DashboardLoad]', error)
         refreshFailureStreakRef.current += 1
+        refreshDelayRef.current = Math.min(
+          10000 * (2 ** (refreshFailureStreakRef.current - 1)),
+          60000
+        )
       } finally {
         if (!didLoadOnceRef.current) {
           didLoadOnceRef.current = true
           setInitialLoading(false)
         }
-        refreshDelayRef.current = WEATHER_POLL_MS
         setRefreshing(false)
         requestRunningRef.current = false
         scheduleNextPoll()
