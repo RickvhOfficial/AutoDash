@@ -18,7 +18,7 @@ export default function LogoBanner({ heroOverlay = false }) {
         <img
           src="/Logo.png"
           alt="AutoDash logo"
-          className="logo-banner-image box-border h-full max-h-full w-auto max-w-full object-contain object-left [mix-blend-mode:screen]"
+          className="logo-banner-image box-border h-full max-h-full w-auto max-w-full object-contain object-left"
         />
         </a>
       </div>

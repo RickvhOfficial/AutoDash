@@ -1,3 +1,4 @@
+// Unsplash service: hourly cache keys, fallback-fotos en dashboard-afbeeldingen ophalen.
 import { readUnsplashCache, writeUnsplashCacheForKey } from './cacheService'
 
 export const UNSPLASH_UTM = 'utm_source=autodash&utm_medium=referral'
@@ -11,6 +12,7 @@ export function getHourlyUnsplashCacheKey() {
   return `${UNSPLASH_HOURLY_CACHE_PREFIX}_${getCurrentHourBucketUtc()}`
 }
 
+// Lokale fallbackset als API/cached fotos tijdelijk niet beschikbaar zijn.
 export function buildFallbackPhotos() {
   return [
     {
@@ -46,6 +48,7 @@ export function buildFallbackPhotos() {
   ]
 }
 
+// Probeert server-API, valt terug op local cache en daarna op placeholders.
 export async function fetchDashboardBackgroundPhotos({
   unsplashApiUrl,
   unsplashAccessKey,

@@ -1,3 +1,4 @@
+// Route: / — dashboard-overzicht met widgets voor volgende race, weer, standen en laptracker.
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import LoadingSpinner from '../components/LoadingSpinner'
@@ -8,6 +9,7 @@ const HERO_IMG =
 
 export const HOME_HERO_HEIGHT_PX = 250
 
+// Bovenste hero-sectie van Home; wordt ook gebruikt voor layout-berekeningen in App.
 export function HomeHero() {
   return (
     <section
@@ -54,6 +56,7 @@ export default function Home() {
     refreshing,
   } = useDashboardData()
 
+  // Lees lokaal opgeslagen lapdata zodat "Mijn rondetijden" direct gevuld kan worden.
   const [myLaps] = useState(() => {
     const raw = localStorage.getItem('lapTimes')
     if (!raw) return []
@@ -65,6 +68,7 @@ export default function Home() {
     }
   })
 
+  // Normaliseer lapdata en bereken totalen/beste/laatste ronde.
   const lapSummary = useMemo(() => {
     if (!myLaps.length) return null
     const normalized = myLaps
@@ -86,9 +90,11 @@ export default function Home() {
     return { total: normalized.length, best: bestLap, latest: latestLap }
   }, [myLaps])
 
+  // Gedeelde card-styling voor alle dashboardtegels.
   const cardClass =
     'group relative overflow-hidden rounded-lg border border-slate-700/80 bg-slate-900/55 p-5 text-left shadow-lg shadow-black/25 transition-[transform,box-shadow,background-color,border-color] duration-300 ease-out hover:scale-[1.015] hover:border-slate-500/80 hover:bg-slate-900/70 hover:shadow-xl hover:shadow-black/45'
 
+  // Rendert achtergrondfoto + overlay per kaarttegel.
   function renderCardBackground(idx, overrideImage) {
     const imageUrl = overrideImage || bgPhotos[idx]?.url || fallbackPhotos[idx]?.url
     return (
@@ -103,6 +109,7 @@ export default function Home() {
     )
   }
 
+  // Converteert OpenF1-datums veilig naar lokale NL weergave.
   function formatMeetingCalendarDate(isoString) {
     if (!isoString || typeof isoString !== 'string') return null
     const datePart = isoString.split('T')[0]

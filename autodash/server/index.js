@@ -1,3 +1,4 @@
+// AutoDash backend: levert dashboard snapshot, racekalender en hourly Unsplash-fotos.
 import 'dotenv/config'
 import express from 'express'
 import cors from 'cors'
@@ -22,6 +23,7 @@ const OPEN_METEO_URL =
   'https://api.open-meteo.com/v1/forecast'
 const OPENF1_TTL_MS = 30 * 60 * 1000
 const WEATHER_TTL_MS = 30 * 1000
+const RACE_CALENDAR_TTL_MS = 15 * 60 * 1000
 
 const DRIVER_NATIONALITIES = {
   1: 'nl',
@@ -116,22 +118,26 @@ let inFlightPromise = null
 let dashboardCache = {
   openf1: { updatedAt: 0, data: null },
   weather: { updatedAt: 0, key: null, data: null },
+  raceCalendar: { updatedAt: 0, seasonYear: null, data: null },
 }
 try {
   if (existsSync(PERSIST_FILE)) {
     const saved = JSON.parse(readFileSync(PERSIST_FILE, 'utf-8'))
     if (saved?.openf1) dashboardCache.openf1 = saved.openf1
     if (saved?.weather) dashboardCache.weather = saved.weather
+    if (saved?.raceCalendar) dashboardCache.raceCalendar = saved.raceCalendar
   }
 } catch {
   // corrupt or missing file — start with empty cache
 }
 let dashboardInFlightPromise = null
 
+// UTC hour-bucket zodat alle clients in hetzelfde uur dezelfde fotos krijgen.
 function getCurrentHourBucketUtc() {
   return Math.floor(Date.now() / (60 * 60 * 1000))
 }
 
+// Normaliseert ruwe Unsplash-response naar frontend-vorm.
 function mapUnsplashPhoto(photo) {
   return {
     url: photo?.urls?.regular || '',
@@ -141,11 +147,13 @@ function mapUnsplashPhoto(photo) {
   }
 }
 
+// Vertaalt drivernummer naar vlag-asset.
 function driverFlag(driverNumber) {
   const code = DRIVER_NATIONALITIES[driverNumber]
   return code ? `https://flagcdn.com/w40/${code}.png` : ''
 }
 
+// Fetch helper met timeout + retry/backoff voor externe APIs.
 async function requestJsonWithRetry(url, retries = 2, timeoutMs = 8000) {
   let lastError = null
   for (let attempt = 0; attempt <= retries; attempt += 1) {
@@ -174,6 +182,7 @@ async function requestJsonWithRetry(url, retries = 2, timeoutMs = 8000) {
   throw lastError || new Error(`Request failed for ${url}`)
 }
 
+// Bouwt OpenF1 snapshot (next race, drivers, standings) met server-cache.
 async function fetchOpenF1Snapshot() {
   const nowTs = Date.now()
   if (dashboardCache.openf1.data && nowTs - dashboardCache.openf1.updatedAt < OPENF1_TTL_MS) {
@@ -278,6 +287,131 @@ async function fetchOpenF1Snapshot() {
   return snapshot
 }
 
+function sortByDateStartAsc(a, b) {
+  return new Date(a.date_start) - new Date(b.date_start)
+}
+
+// Normaliseert race-status op basis van start/einddatums.
+function toRaceStatus(dateStart, dateEnd, now) {
+  const start = new Date(dateStart)
+  const end = new Date(dateEnd || dateStart)
+  if (Number.isNaN(start.getTime())) return 'Aankomend'
+  if (now > end) return 'Voorbij'
+  const weekendWindowStart = new Date(start.getTime() - 7 * 24 * 60 * 60 * 1000)
+  if (now >= weekendWindowStart && now <= end) return 'Dit weekend'
+  return 'Aankomend'
+}
+
+// Mapt OpenF1 racesessie naar kalenderregel voor de frontend.
+function mapRaceSession(session, meetingNameByKey, now) {
+  const meetingMeta = meetingNameByKey.get(session.meeting_key) || null
+  const meetingTitle = meetingMeta?.name || session.meeting_name
+  return {
+    sessionKey: session.session_key ?? null,
+    meetingName: meetingTitle || session.session_name || 'Race onbekend',
+    circuitName: session.circuit_short_name || session.location || 'Circuit onbekend',
+    countryName: session.country_name || 'Land onbekend',
+    countryFlag: session.country_flag || '',
+    dateStart: meetingMeta?.dateStart || session.date_start || null,
+    dateEnd: meetingMeta?.dateEnd || session.date_end || session.date_start || null,
+    status: toRaceStatus(
+      meetingMeta?.dateStart || session.date_start,
+      meetingMeta?.dateEnd || session.date_end || session.date_start,
+      now
+    ),
+  }
+}
+
+async function fetchRaceSessionsForYear(year) {
+  const sessions = await requestJsonWithRetry(`${OPENF1_BASE}/sessions?year=${year}&session_name=Race`)
+  return Array.isArray(sessions) ? sessions.sort(sortByDateStartAsc) : []
+}
+
+async function fetchMeetingNameMapForYear(year) {
+  try {
+    const meetings = await requestJsonWithRetry(`${OPENF1_BASE}/meetings?year=${year}`)
+    if (!Array.isArray(meetings)) return new Map()
+    return new Map(
+      meetings.map((meeting) => [
+        meeting.meeting_key,
+        {
+          name: meeting.meeting_name || 'Race onbekend',
+          dateStart: meeting.date_start || null,
+          dateEnd: meeting.date_end || meeting.date_start || null,
+        },
+      ])
+    )
+  } catch {
+    return new Map()
+  }
+}
+
+// Bouwt racekalender per seizoen met cache en fallback naar volgend jaar.
+async function fetchRaceCalendarSnapshot() {
+  const nowTs = Date.now()
+  const cachedCalendarData = Array.isArray(dashboardCache.raceCalendar.data)
+    ? dashboardCache.raceCalendar.data
+    : []
+  const cacheLooksLegacy =
+    cachedCalendarData.length > 0 &&
+    cachedCalendarData.every((race) => race.meetingName === 'Race' || !race.dateEnd)
+  if (
+    cachedCalendarData.length > 0 &&
+    !cacheLooksLegacy &&
+    nowTs - dashboardCache.raceCalendar.updatedAt < RACE_CALENDAR_TTL_MS
+  ) {
+    return {
+      races: cachedCalendarData,
+      seasonYear: dashboardCache.raceCalendar.seasonYear,
+      cached: true,
+      updatedAt: dashboardCache.raceCalendar.updatedAt,
+    }
+  }
+
+  const now = new Date()
+  const currentYear = now.getFullYear()
+  const currentYearSessions = await fetchRaceSessionsForYear(currentYear)
+
+  const hasUpcomingCurrentYearRace = currentYearSessions.some(
+    (session) => session.date_end && new Date(session.date_end) >= now && !session.is_cancelled
+  )
+  const shouldFallbackToNextYear =
+    currentYearSessions.length === 0 || !hasUpcomingCurrentYearRace
+
+  let selectedYear = currentYear
+  let selectedSessions = currentYearSessions
+  if (shouldFallbackToNextYear) {
+    const nextYearSessions = await fetchRaceSessionsForYear(currentYear + 1)
+    if (nextYearSessions.length > 0) {
+      selectedYear = currentYear + 1
+      selectedSessions = nextYearSessions
+    }
+  }
+
+  const meetingNameByKey = await fetchMeetingNameMapForYear(selectedYear)
+
+  const mappedRaces = selectedSessions
+    .filter((session) => !session.is_cancelled)
+    .map((session) => mapRaceSession(session, meetingNameByKey, now))
+
+  dashboardCache.raceCalendar = {
+    updatedAt: nowTs,
+    seasonYear: selectedYear,
+    data: mappedRaces,
+  }
+  try {
+    writeFileSync(PERSIST_FILE, JSON.stringify(dashboardCache), 'utf-8')
+  } catch {}
+
+  return {
+    races: mappedRaces,
+    seasonYear: selectedYear,
+    cached: false,
+    updatedAt: nowTs,
+  }
+}
+
+// Haalt actuele weerdata op voor de volgende race met coord-fallback.
 async function fetchWeatherSnapshot(nextRace) {
   const nowTs = Date.now()
   if (!nextRace) return { weather: null, weatherUpdatedAt: 0 }
@@ -321,6 +455,7 @@ async function fetchWeatherSnapshot(nextRace) {
   return { weather, weatherUpdatedAt: nowTs }
 }
 
+// Combineert OpenF1 + weather tot één dashboard payload.
 async function getDashboardSnapshot() {
   if (!dashboardInFlightPromise) {
     dashboardInFlightPromise = (async () => {
@@ -344,6 +479,7 @@ async function getDashboardSnapshot() {
   return dashboardInFlightPromise
 }
 
+// Haalt exact 5 fotos op uit Unsplash voor het huidige uur.
 async function fetchHourlyPhotosFromUnsplash() {
   if (!UNSPLASH_ACCESS_KEY) {
     throw new Error('UNSPLASH_ACCESS_KEY ontbreekt op server.')
@@ -370,6 +506,7 @@ async function fetchHourlyPhotosFromUnsplash() {
   return mappedPhotos
 }
 
+// Geeft de huidige hour-bucket set terug, met in-flight deduping.
 async function getHourlyPhotos() {
   const currentHour = getCurrentHourBucketUtc()
   if (cache.hourBucket === currentHour && Array.isArray(cache.photos) && cache.photos.length === 5) {
@@ -396,6 +533,7 @@ app.get('/health', (_req, res) => {
   res.json({ ok: true })
 })
 
+// Hourly foto-endpoint met centrale fallback zodat alle clients gelijk blijven.
 app.get('/api/unsplash-hourly', async (_req, res) => {
   const currentHour = getCurrentHourBucketUtc()
   try {
@@ -417,6 +555,7 @@ app.get('/api/unsplash-hourly', async (_req, res) => {
   }
 })
 
+// Dashboard endpoint voor widgets op home.
 app.get('/api/dashboard-snapshot', async (_req, res) => {
   try {
     const data = await getDashboardSnapshot()
@@ -441,6 +580,32 @@ app.get('/api/dashboard-snapshot', async (_req, res) => {
     } else {
       res.status(502).json({
         error: 'Dashboard data tijdelijk niet beschikbaar.',
+        detail: error instanceof Error ? error.message : 'Unknown error',
+      })
+    }
+  }
+})
+
+// Racekalender endpoint met last-known-good fallback.
+app.get('/api/race-calendar', async (_req, res) => {
+  try {
+    const data = await fetchRaceCalendarSnapshot()
+    res.setHeader('Cache-Control', 'public, max-age=30')
+    res.json(data)
+  } catch (error) {
+    const hasCachedCalendar = Array.isArray(dashboardCache.raceCalendar.data)
+    if (hasCachedCalendar) {
+      res.setHeader('Cache-Control', 'no-store')
+      res.json({
+        races: dashboardCache.raceCalendar.data,
+        seasonYear: dashboardCache.raceCalendar.seasonYear,
+        cached: true,
+        stale: true,
+        updatedAt: dashboardCache.raceCalendar.updatedAt,
+      })
+    } else {
+      res.status(502).json({
+        error: 'Racekalender tijdelijk niet beschikbaar.',
         detail: error instanceof Error ? error.message : 'Unknown error',
       })
     }

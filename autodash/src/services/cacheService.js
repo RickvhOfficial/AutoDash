@@ -1,3 +1,4 @@
+// LocalStorage cachehelpers voor dashboarddata en hourly Unsplash-afbeeldingen.
 export const CACHE_KEY = 'autodash_cache_site_v1'
 export const CACHE_MAX_AGE_MS = 60 * 60 * 1000
 export const UNSPLASH_BG_CACHE_KEY = 'autodash_unsplash_bg_v1'
@@ -7,6 +8,7 @@ export function getCacheKey() {
   return CACHE_KEY
 }
 
+// Leest dashboardcache en valideert op maximale leeftijd.
 export function readCache(cacheKey) {
   try {
     const raw = localStorage.getItem(cacheKey)
@@ -19,6 +21,7 @@ export function readCache(cacheKey) {
   }
 }
 
+// Merged partial update zodat losse widgets cache kunnen bijwerken.
 export function writeCache(cacheKey, partial) {
   try {
     const existing = readCache(cacheKey) || {}
@@ -31,6 +34,7 @@ export function writeCache(cacheKey, partial) {
   }
 }
 
+// Leest specifieke Unsplash-cache-entry met TTL + shape-validatie.
 export function readUnsplashCache(cacheKey = UNSPLASH_BG_CACHE_KEY) {
   try {
     const raw = localStorage.getItem(cacheKey)
@@ -48,6 +52,7 @@ export function writeUnsplashCache(photos) {
   return writeUnsplashCacheForKey(photos, UNSPLASH_BG_CACHE_KEY)
 }
 
+// Schrijft hourly Unsplash-resultaten onder een expliciete cache key.
 export function writeUnsplashCacheForKey(photos, cacheKey = UNSPLASH_BG_CACHE_KEY) {
   try {
     localStorage.setItem(
