@@ -4,7 +4,11 @@ import ErrorMessage from '../components/ErrorMessage'
 import LoadingSpinner from '../components/LoadingSpinner'
 import RaceCard from '../components/RaceCard'
 import { HOME_HERO_HEIGHT_PX } from './Home'
-import { LOADER_MIN_VISIBLE_MS } from '../constants/uiTiming'
+import {
+  LOADER_MIN_VISIBLE_MS,
+  SNAPSHOT_STARTUP_MAX_ATTEMPTS,
+  SNAPSHOT_STARTUP_RETRY_BASE_MS,
+} from '../constants/uiTiming'
 import { CACHE_KEY_RACE_CALENDAR, readCache, writeCache } from '../services/cacheService'
 import { getCountryFlag } from '../services/countriesService'
 import { getRaceCalendar } from '../services/f1Service'
@@ -63,7 +67,6 @@ export default function RaceCalendar() {
   const [races, setRaces] = useState(initialRaces)
   const [seasonYear, setSeasonYear] = useState(cached?.seasonYear ?? new Date().getFullYear())
   const [loading, setLoading] = useState(initialRaces.length === 0)
-  const [refreshing, setRefreshing] = useState(initialRaces.length > 0)
   const [error, setError] = useState('')
   const [stale, setStale] = useState(false)
 
@@ -71,29 +74,87 @@ export default function RaceCalendar() {
   const loadRaceCalendar = useCallback(async (signal) => {
     const refreshStartedAt = Date.now()
     const hadCachedData = (cachedRef.current?.races?.length ?? 0) > 0
+    const coldStart = !hadCachedData
+    const maxAttempts = coldStart ? SNAPSHOT_STARTUP_MAX_ATTEMPTS : 1
+
     if (!hadCachedData) setLoading(true)
-    else setRefreshing(true)
     setError('')
+
+    let enrichedRaces = []
+    let yearOut = new Date().getFullYear()
+    let staleOut = false
+    let lastErr = null
+
     try {
-      const data = await getRaceCalendar(signal)
-      const enrichedRaces = await Promise.all(
-        data.races.map(async (race) => {
-          if (race.countryFlag) return race
-          const flag = await getCountryFlag(race.countryName, signal)
-          return {
-            ...race,
-            countryFlag: flag || '',
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        if (signal?.aborted) break
+        if (attempt > 0) {
+          await new Promise((r) =>
+            setTimeout(r, Math.min(800, SNAPSHOT_STARTUP_RETRY_BASE_MS * attempt))
+          )
+        }
+        try {
+          const data = await getRaceCalendar(signal)
+          const racesIn = Array.isArray(data?.races) ? data.races : []
+          yearOut = data?.seasonYear ?? yearOut
+          staleOut = Boolean(data.stale)
+          if (racesIn.length === 0 && coldStart) {
+            lastErr = null
+            continue
           }
+          const enriched = await Promise.all(
+            racesIn.map(async (race) => {
+              if (race.countryFlag) return race
+              const flag = await getCountryFlag(race.countryName, signal)
+              return {
+                ...race,
+                countryFlag: flag || '',
+              }
+            })
+          )
+          enrichedRaces = enriched
+          lastErr = null
+          break
+        } catch (err) {
+          if (err?.name === 'AbortError') break
+          lastErr = err
+          if (!coldStart || attempt === maxAttempts - 1) break
+        }
+      }
+
+      if (signal?.aborted) return
+
+      if (enrichedRaces.length > 0) {
+        setRaces(enrichedRaces)
+        setSeasonYear(yearOut)
+        setStale(staleOut)
+        writeCache(CACHE_KEY_RACE_CALENDAR, {
+          races: enrichedRaces,
+          seasonYear: yearOut,
         })
-      )
-      setRaces(enrichedRaces)
-      setSeasonYear(data.seasonYear)
-      setStale(data.stale)
-      writeCache(CACHE_KEY_RACE_CALENDAR, {
-        races: enrichedRaces,
-        seasonYear: data.seasonYear,
-      })
-      cachedRef.current = { races: enrichedRaces, seasonYear: data.seasonYear }
+        cachedRef.current = { races: enrichedRaces, seasonYear: yearOut }
+      } else if (coldStart && lastErr) {
+        setRaces([])
+        setError(lastErr?.message || 'Racekalender kon niet worden geladen.')
+      } else if (coldStart) {
+        setRaces([])
+        setSeasonYear(yearOut)
+        setStale(staleOut)
+        setError('')
+      } else if (lastErr) {
+        setError('')
+      } else {
+        setRaces(enrichedRaces)
+        setSeasonYear(yearOut)
+        setStale(staleOut)
+        if (enrichedRaces.length > 0) {
+          writeCache(CACHE_KEY_RACE_CALENDAR, {
+            races: enrichedRaces,
+            seasonYear: yearOut,
+          })
+          cachedRef.current = { races: enrichedRaces, seasonYear: yearOut }
+        }
+      }
     } catch (err) {
       if (err?.name !== 'AbortError' && !hadCachedData) {
         setError(err?.message || 'Racekalender kon niet worden geladen.')
@@ -104,30 +165,37 @@ export default function RaceCalendar() {
         if (elapsed < LOADER_MIN_VISIBLE_MS) {
           await new Promise((r) => setTimeout(r, LOADER_MIN_VISIBLE_MS - elapsed))
         }
+        setLoading(false)
       }
-      setLoading(false)
-      setRefreshing(false)
     }
   }, [])
 
   useEffect(() => {
     let pollTimer = null
-    let currentController = null
+    let activeController = null
     let cancelled = false
 
-    async function tick() {
+    async function runPoll() {
       if (cancelled) return
-      currentController = new AbortController()
-      await loadRaceCalendar(currentController.signal)
-      if (cancelled) return
-      pollTimer = window.setTimeout(tick, PAGE_DATA_POLL_MS)
+      activeController = new AbortController()
+      await loadRaceCalendar(activeController.signal)
+      if (!cancelled) {
+        pollTimer = window.setTimeout(runPoll, PAGE_DATA_POLL_MS)
+      }
     }
 
-    tick()
+    ;(async function initialFetch() {
+      activeController = new AbortController()
+      await loadRaceCalendar(activeController.signal)
+      if (!cancelled) {
+        pollTimer = window.setTimeout(runPoll, PAGE_DATA_POLL_MS)
+      }
+    })()
+
     return () => {
       cancelled = true
       if (pollTimer) clearTimeout(pollTimer)
-      currentController?.abort()
+      activeController?.abort()
     }
   }, [loadRaceCalendar])
 
@@ -187,7 +255,18 @@ export default function RaceCalendar() {
             {error && <ErrorMessage message={error} onRetry={handleRetry} />}
 
             {!error && races.length === 0 && (
-              <ErrorMessage message="Er zijn geen races gevonden voor dit seizoen." onRetry={handleRetry} />
+              <div className="rounded-lg border border-slate-700 bg-slate-900/50 p-6 text-center text-slate-300">
+                <p className="mb-4 text-base leading-relaxed">
+                  Er zijn geen races gevonden voor dit seizoen.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleRetry}
+                  className="rounded-md border border-slate-600 bg-slate-800 px-4 py-2 text-sm font-medium text-slate-100 transition hover:bg-slate-700"
+                >
+                  Opnieuw proberen
+                </button>
+              </div>
             )}
 
             {!error && races.length > 0 && (
@@ -294,13 +373,6 @@ export default function RaceCalendar() {
             </div>
           </div>
             )}
-          </div>
-        )}
-        {!loading && refreshing && (
-          <div className="pointer-events-none absolute right-2 top-2 z-20 md:right-10 md:top-10">
-            <div className="origin-top-right scale-[0.45]">
-              <LoadingSpinner compact message="" />
-            </div>
           </div>
         )}
       </section>

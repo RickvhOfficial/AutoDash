@@ -40,7 +40,7 @@ function getLandLabel(driver) {
 }
 
 export default function DriverStandings() {
-  const { drivers, seasonYear, loading, refreshing, error } = useF1Drivers()
+  const { drivers, seasonYear, loading, error } = useF1Drivers()
   const [search, setSearch] = useState('')
   const displayYear = seasonYear ?? new Date().getFullYear()
 
@@ -119,7 +119,11 @@ export default function DriverStandings() {
             )}
 
             {!error && drivers.length === 0 && (
-              <ErrorMessage message="Er is nog geen actuele kampioenschapsstand beschikbaar." />
+              <div className="rounded-lg border border-slate-700 bg-slate-900/50 p-6 text-center text-slate-300">
+                <p className="text-base leading-relaxed">
+                  Er is nog geen actuele kampioenschapsstand beschikbaar.
+                </p>
+              </div>
             )}
 
             {!error && drivers.length > 0 && visible.length === 0 && (
@@ -206,13 +210,6 @@ export default function DriverStandings() {
             </div>
           </div>
             )}
-          </div>
-        )}
-        {!loading && refreshing && (
-          <div className="pointer-events-none absolute right-2 top-2 z-20 md:right-10 md:top-10">
-            <div className="origin-top-right scale-[0.45]">
-              <LoadingSpinner compact message="" />
-            </div>
           </div>
         )}
       </section>
