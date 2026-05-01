@@ -1,4 +1,4 @@
-﻿// -----------------------------------------------------------------------------
+// -----------------------------------------------------------------------------
 // Hoofdapplicatie-shell: Router, layout en gedeelde navigatiestate (menuOpen).
 //
 // Desktop-sidebar: zwevende kolom; `top` = `--sidebar-mid-y` (gemeten t.o.v. footer in viewport).
@@ -82,7 +82,8 @@ function AppLayout() {
 
   const isHome = location.pathname === '/'
   const isRaceCalendar = location.pathname === '/races'
-  const usesTopHeroLayout = isHome || isRaceCalendar
+  const isDriverStandings = location.pathname === '/standings'
+  const usesTopHeroLayout = isHome || isRaceCalendar || isDriverStandings
 
   const footerRef = useRef(null)
 
@@ -209,7 +210,7 @@ function AppLayout() {
       {/* lg: inspring = smalle sidebar (4.5rem) + kleine lucht; aside left-0 */}
       <main
         className={`flex min-h-0 flex-1 flex-col pl-0 ${
-          isRaceCalendar ? 'lg:pl-0' : 'lg:pl-[5rem]'
+          isRaceCalendar || isDriverStandings ? 'lg:pl-0' : 'lg:pl-[5rem]'
         } ${
           usesTopHeroLayout ? 'pt-0' : 'pt-24'
         }`}

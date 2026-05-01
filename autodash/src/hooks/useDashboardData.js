@@ -1,6 +1,7 @@
-// Centrale dashboard-hook: laadt widgets, beheert polling en combineert cache + fallback.
+// Centrale dashboard-hook: cache-first render + server fetch + cache overschrijven.
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { getCacheKey, readCache, readUnsplashCache, writeCache } from '../services/cacheService'
+import { LOADER_MIN_VISIBLE_MS } from '../constants/uiTiming'
+import { CACHE_KEY, readCache, readUnsplashCache, writeCache } from '../services/cacheService'
 import {
   buildFallbackPhotos,
   fetchDashboardBackgroundPhotos,
@@ -9,11 +10,8 @@ import {
 
 const WEATHER_POLL_MS = 30000
 const INITIAL_LOADING_MAX_WAIT_MS = 2200
-
 export function useDashboardData() {
-  const cacheKeyRef = useRef(getCacheKey())
-  const cacheKey = cacheKeyRef.current
-  const cached = readCache(cacheKey)
+  const cached = readCache(CACHE_KEY)
   const currentSeasonYear = new Date().getFullYear()
   const canUseLegacySeasonStatsCache =
     !cached?.seasonStatsYear &&
@@ -61,7 +59,7 @@ export function useDashboardData() {
     return Array.isArray(hourlyCachedPhotos) ? hourlyCachedPhotos : []
   })
   const [initialLoading, setInitialLoading] = useState(() => !cached)
-  const [refreshing, setRefreshing] = useState(false)
+  const [refreshing, setRefreshing] = useState(() => Boolean(cached))
 
   const didLoadOnceRef = useRef(!!cached)
   const requestRunningRef = useRef(false)
@@ -73,7 +71,7 @@ export function useDashboardData() {
 
   const fallbackPhotos = useMemo(() => buildFallbackPhotos(), [])
 
-  // Pollt dashboard-snapshot met backoff en bewaart bruikbare data in local cache.
+  // Pollt dashboard-snapshot; cache wordt na elke succesvolle fetch overschreven.
   useEffect(() => {
     let refreshTimer = null
     let currentController = null
@@ -82,16 +80,15 @@ export function useDashboardData() {
       didLoadOnceRef.current = true
     }, INITIAL_LOADING_MAX_WAIT_MS)
 
-    // Plan volgende refresh op basis van huidige succes/failure delay.
     function scheduleNextPoll() {
       if (refreshTimer) clearTimeout(refreshTimer)
       refreshTimer = setTimeout(loadDashboardData, refreshDelayRef.current)
     }
 
-    // Haalt alle dashboarddata op uit de server-snapshot.
     async function loadDashboardData() {
       if (requestRunningRef.current) return
       requestRunningRef.current = true
+      const refreshStartedAt = Date.now()
       setRefreshing(true)
       currentController = new AbortController()
       const signal = currentController.signal
@@ -108,7 +105,13 @@ export function useDashboardData() {
         const nowTs = Date.now()
 
         if (data?.nextRace) {
-          setNextRace({ loading: false, error: '', data: data.nextRace, stale: false, lastUpdated: data?.timestamps?.nextRaceUpdatedAt || nowTs })
+          setNextRace({
+            loading: false,
+            error: '',
+            data: data.nextRace,
+            stale: Boolean(data.stale),
+            lastUpdated: data?.timestamps?.nextRaceUpdatedAt || nowTs,
+          })
           cacheUpdate.nextRace = data.nextRace
           cacheUpdate.nextRaceUpdatedAt = data?.timestamps?.nextRaceUpdatedAt || nowTs
         } else {
@@ -120,7 +123,13 @@ export function useDashboardData() {
         }
 
         if (data?.weather) {
-          setWeather({ loading: false, error: '', data: data.weather, stale: false, lastUpdated: data?.timestamps?.weatherUpdatedAt || nowTs })
+          setWeather({
+            loading: false,
+            error: '',
+            data: data.weather,
+            stale: Boolean(data.stale),
+            lastUpdated: data?.timestamps?.weatherUpdatedAt || nowTs,
+          })
           cacheUpdate.weather = data.weather
           cacheUpdate.weatherUpdatedAt = data?.timestamps?.weatherUpdatedAt || nowTs
         } else {
@@ -132,7 +141,13 @@ export function useDashboardData() {
         }
 
         if (Array.isArray(data?.drivers) && data.drivers.length > 0) {
-          setDrivers({ loading: false, error: '', data: data.drivers, stale: false, lastUpdated: data?.timestamps?.driversUpdatedAt || nowTs })
+          setDrivers({
+            loading: false,
+            error: '',
+            data: data.drivers,
+            stale: Boolean(data.stale),
+            lastUpdated: data?.timestamps?.driversUpdatedAt || nowTs,
+          })
           cacheUpdate.drivers = data.drivers
           cacheUpdate.driversUpdatedAt = data?.timestamps?.driversUpdatedAt || nowTs
         } else {
@@ -148,7 +163,7 @@ export function useDashboardData() {
             loading: false,
             error: '',
             data: data.seasonStats,
-            stale: false,
+            stale: Boolean(data.stale),
             lastUpdated: data?.timestamps?.seasonStatsUpdatedAt || nowTs,
           })
           cacheUpdate.seasonStats = data.seasonStats
@@ -163,14 +178,13 @@ export function useDashboardData() {
         }
 
         if (Object.keys(cacheUpdate).length > 0) {
-          writeCache(cacheKey, cacheUpdate)
+          writeCache(CACHE_KEY, cacheUpdate)
         }
         refreshFailureStreakRef.current = 0
         refreshDelayRef.current = WEATHER_POLL_MS
       } catch (error) {
         if (error?.name !== 'AbortError') {
           console.error('[DashboardLoad]', error)
-          // Zorg dat widgets niet oneindig blijven laden zonder cache (bv. incognito).
           setNextRace((prev) =>
             prev.data
               ? { ...prev, loading: false, error: '', stale: true }
@@ -198,6 +212,12 @@ export function useDashboardData() {
           60000
         )
       } finally {
+        if (!signal.aborted) {
+          const elapsed = Date.now() - refreshStartedAt
+          if (elapsed < LOADER_MIN_VISIBLE_MS) {
+            await new Promise((r) => setTimeout(r, LOADER_MIN_VISIBLE_MS - elapsed))
+          }
+        }
         if (!didLoadOnceRef.current) {
           didLoadOnceRef.current = true
           setInitialLoading(false)
@@ -215,9 +235,9 @@ export function useDashboardData() {
       if (currentController) currentController.abort()
       requestRunningRef.current = false
     }
-  }, [cacheKey])
+  }, [])
 
-  // Laadt achtergrondfotos (API of cache/fallback) los van widget polling.
+  // Achtergrondfotos: API + optionele client-cache (los van F1-data).
   useEffect(() => {
     const controller = new AbortController()
     async function loadUnsplashImages() {

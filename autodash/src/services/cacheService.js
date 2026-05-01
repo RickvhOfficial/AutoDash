@@ -1,5 +1,7 @@
 // LocalStorage cachehelpers voor dashboarddata en hourly Unsplash-afbeeldingen.
 export const CACHE_KEY = 'autodash_cache_site_v1'
+export const CACHE_KEY_RACE_CALENDAR = 'autodash_cache_race_calendar_v1'
+export const CACHE_KEY_DRIVER_STANDINGS = 'autodash_cache_driver_standings_v1'
 export const CACHE_MAX_AGE_MS = 60 * 60 * 1000
 export const UNSPLASH_BG_CACHE_KEY = 'autodash_unsplash_bg_v1'
 export const UNSPLASH_BG_TTL_MS = 60 * 60 * 1000
