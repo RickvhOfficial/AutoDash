@@ -1,15 +1,19 @@
 // Route: /races — toont F1-kalender, next-race highlight en desktop/mobile weergave.
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import ErrorMessage from '../components/ErrorMessage'
 import LoadingSpinner from '../components/LoadingSpinner'
 import RaceCard from '../components/RaceCard'
-import raceHeroImage from '/public/RaceKalender.jpg'
 import { HOME_HERO_HEIGHT_PX } from './Home'
+import { LOADER_MIN_VISIBLE_MS } from '../constants/uiTiming'
+import { CACHE_KEY_RACE_CALENDAR, readCache, writeCache } from '../services/cacheService'
 import { getCountryFlag } from '../services/countriesService'
 import { getRaceCalendar } from '../services/f1Service'
 
 // Zelfde hero-hoogte als Home voor consistente top-layout tussen routes.
 const RACE_HERO_HEIGHT_PX = HOME_HERO_HEIGHT_PX
+const raceHeroImage = '/RaceKalender.jpg'
+/** Zelfde interval als dashboard (`useDashboardData`): periodiek serverdata verversen. */
+const PAGE_DATA_POLL_MS = 30000
 
 // Parse alleen de datumcomponent (zonder lokale tijdverschuivingen).
 function parseDateOnly(isoDateString) {
@@ -52,15 +56,23 @@ function getRaceStartTime(session) {
 }
 
 export default function RaceCalendar() {
-  const [races, setRaces] = useState([])
-  const [seasonYear, setSeasonYear] = useState(new Date().getFullYear())
-  const [loading, setLoading] = useState(true)
+  const cachedRef = useRef(readCache(CACHE_KEY_RACE_CALENDAR))
+  const cached = cachedRef.current
+  const initialRaces = Array.isArray(cached?.races) ? cached.races : []
+
+  const [races, setRaces] = useState(initialRaces)
+  const [seasonYear, setSeasonYear] = useState(cached?.seasonYear ?? new Date().getFullYear())
+  const [loading, setLoading] = useState(initialRaces.length === 0)
+  const [refreshing, setRefreshing] = useState(initialRaces.length > 0)
   const [error, setError] = useState('')
   const [stale, setStale] = useState(false)
 
   // Laadt kalenderdata en vult missende vlaggen waar nodig aan.
   const loadRaceCalendar = useCallback(async (signal) => {
-    setLoading(true)
+    const refreshStartedAt = Date.now()
+    const hadCachedData = (cachedRef.current?.races?.length ?? 0) > 0
+    if (!hadCachedData) setLoading(true)
+    else setRefreshing(true)
     setError('')
     try {
       const data = await getRaceCalendar(signal)
@@ -77,21 +89,46 @@ export default function RaceCalendar() {
       setRaces(enrichedRaces)
       setSeasonYear(data.seasonYear)
       setStale(data.stale)
+      writeCache(CACHE_KEY_RACE_CALENDAR, {
+        races: enrichedRaces,
+        seasonYear: data.seasonYear,
+      })
+      cachedRef.current = { races: enrichedRaces, seasonYear: data.seasonYear }
     } catch (err) {
-      if (err?.name !== 'AbortError') {
+      if (err?.name !== 'AbortError' && !hadCachedData) {
         setError(err?.message || 'Racekalender kon niet worden geladen.')
       }
     } finally {
       if (!signal?.aborted) {
-        setLoading(false)
+        const elapsed = Date.now() - refreshStartedAt
+        if (elapsed < LOADER_MIN_VISIBLE_MS) {
+          await new Promise((r) => setTimeout(r, LOADER_MIN_VISIBLE_MS - elapsed))
+        }
       }
+      setLoading(false)
+      setRefreshing(false)
     }
   }, [])
 
   useEffect(() => {
-    const controller = new AbortController()
-    loadRaceCalendar(controller.signal)
-    return () => controller.abort()
+    let pollTimer = null
+    let currentController = null
+    let cancelled = false
+
+    async function tick() {
+      if (cancelled) return
+      currentController = new AbortController()
+      await loadRaceCalendar(currentController.signal)
+      if (cancelled) return
+      pollTimer = window.setTimeout(tick, PAGE_DATA_POLL_MS)
+    }
+
+    tick()
+    return () => {
+      cancelled = true
+      if (pollTimer) clearTimeout(pollTimer)
+      currentController?.abort()
+    }
   }, [loadRaceCalendar])
 
   function handleRetry() {
@@ -131,24 +168,29 @@ export default function RaceCalendar() {
         </div>
       </div>
 
-      <div className="mx-auto w-full max-w-6xl px-6 py-8 md:px-10">
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-2">
-          {stale && (
-            <p className="rounded-md border border-red-500/60 bg-red-600/10 px-3 py-1 text-xs text-red-200">
-              Tijdelijk cache-data getoond.
-            </p>
-          )}
-        </div>
-
-        {loading && <LoadingSpinner message="Racekalender laden..." />}
-
-        {!loading && error && <ErrorMessage message={error} onRetry={handleRetry} />}
-
-        {!loading && !error && races.length === 0 && (
-          <ErrorMessage message="Er zijn geen races gevonden voor dit seizoen." onRetry={handleRetry} />
+      <section className="relative flex min-h-0 flex-1 flex-col justify-center px-6 py-10 md:pl-[5rem] md:pr-[3.5rem] md:py-12 lg:py-14">
+        {loading && (
+          <div className="mx-auto w-full max-w-6xl">
+            <LoadingSpinner message="Racekalender laden..." />
+          </div>
         )}
+        {!loading && (
+          <div className="mx-auto w-full max-w-6xl">
+            <div className="mb-6 flex flex-wrap items-center justify-between gap-2">
+              {stale && (
+                <p className="rounded-md border border-red-500/60 bg-red-600/10 px-3 py-1 text-xs text-red-200">
+                  Tijdelijk cache-data getoond.
+                </p>
+              )}
+            </div>
 
-        {!loading && !error && races.length > 0 && (
+            {error && <ErrorMessage message={error} onRetry={handleRetry} />}
+
+            {!error && races.length === 0 && (
+              <ErrorMessage message="Er zijn geen races gevonden voor dit seizoen." onRetry={handleRetry} />
+            )}
+
+            {!error && races.length > 0 && (
           <div className="space-y-5">
             {nextRace && (
               <div className="hidden items-center justify-between rounded-2xl border border-[#ff1e00]/80 bg-[#181922] px-7 py-5 shadow-[0_0_24px_rgba(255,30,0,0.2)] lg:flex">
@@ -251,8 +293,17 @@ export default function RaceCalendar() {
               ))}
             </div>
           </div>
+            )}
+          </div>
         )}
-      </div>
+        {!loading && refreshing && (
+          <div className="pointer-events-none absolute right-2 top-2 z-20 md:right-10 md:top-10">
+            <div className="origin-top-right scale-[0.45]">
+              <LoadingSpinner compact message="" />
+            </div>
+          </div>
+        )}
+      </section>
     </section>
   )
 }

@@ -50,6 +50,31 @@ const DRIVER_NATIONALITIES = {
   81: 'au',
   87: 'gb',
 }
+const DRIVER_COUNTRY_CODES = {
+  1: 'NED',
+  3: 'NED',
+  4: 'GBR',
+  5: 'BRA',
+  6: 'FRA',
+  10: 'FRA',
+  11: 'MEX',
+  12: 'ITA',
+  14: 'ESP',
+  16: 'MON',
+  18: 'CAN',
+  23: 'THA',
+  27: 'DEU',
+  30: 'NZL',
+  31: 'FRA',
+  41: 'GBR',
+  43: 'ARG',
+  44: 'GBR',
+  55: 'ESP',
+  63: 'GBR',
+  77: 'FIN',
+  81: 'AUS',
+  87: 'GBR',
+}
 const CIRCUIT_COORDS = {
   Sakhir: { latitude: 26.0325, longitude: 50.5106 },
   Jeddah: { latitude: 21.6319, longitude: 39.1044 },
@@ -132,6 +157,18 @@ try {
 }
 let dashboardInFlightPromise = null
 
+function hasEnrichedSeasonStats(openf1Data) {
+  const seasonStats = openf1Data?.seasonStats
+  if (!Array.isArray(seasonStats) || seasonStats.length === 0) return true
+  return seasonStats.some(
+    (row) =>
+      Object.prototype.hasOwnProperty.call(row, 'team_name') ||
+      Object.prototype.hasOwnProperty.call(row, 'headshot_url') ||
+      Object.prototype.hasOwnProperty.call(row, 'country_code') ||
+      Object.prototype.hasOwnProperty.call(row, 'name_acronym')
+  )
+}
+
 // UTC hour-bucket zodat alle clients in hetzelfde uur dezelfde fotos krijgen.
 function getCurrentHourBucketUtc() {
   return Math.floor(Date.now() / (60 * 60 * 1000))
@@ -185,7 +222,11 @@ async function requestJsonWithRetry(url, retries = 2, timeoutMs = 8000) {
 // Bouwt OpenF1 snapshot (next race, drivers, standings) met server-cache.
 async function fetchOpenF1Snapshot() {
   const nowTs = Date.now()
-  if (dashboardCache.openf1.data && nowTs - dashboardCache.openf1.updatedAt < OPENF1_TTL_MS) {
+  if (
+    dashboardCache.openf1.data &&
+    nowTs - dashboardCache.openf1.updatedAt < OPENF1_TTL_MS &&
+    hasEnrichedSeasonStats(dashboardCache.openf1.data)
+  ) {
     return dashboardCache.openf1.data
   }
 
@@ -245,11 +286,22 @@ async function fetchOpenF1Snapshot() {
     seasonStats = (Array.isArray(standingsData) ? standingsData : [])
       .map((row) => {
         const driver = driverByNumber.get(row.driver_number)
+        const fullName = driver
+          ? `${driver.first_name ?? ''} ${driver.last_name ?? ''}`.trim() || driver.broadcast_name
+          : `#${row.driver_number}`
         return {
           position: row.position_current ?? row.position_start ?? null,
-          name: driver
-            ? `${driver.first_name ?? ''} ${driver.last_name ?? ''}`.trim() || driver.broadcast_name
-            : `#${row.driver_number}`,
+          driver_number: row.driver_number,
+          name: fullName,
+          full_name: fullName,
+          name_acronym: driver?.name_acronym || null,
+          team_name: driver?.team_name || null,
+          team_colour: driver?.team_colour || null,
+          country_code:
+            driver?.country_code ||
+            DRIVER_COUNTRY_CODES[row.driver_number] ||
+            null,
+          headshot_url: driver?.headshot_url || null,
           points: row.points_current ?? row.points_start ?? 0,
           flag: driverFlag(row.driver_number),
         }
