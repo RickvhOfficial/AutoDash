@@ -1,8 +1,13 @@
-// Custom hook: cache-first render + server fetch + cache overschrijven + 30s polling (zoals dashboard).
-// Server (via /api/dashboard-snapshot) blijft de bron van waarheid.
+// Custom hook: cache-first + directe GET naar /api/dashboard-snapshot, daarna 30s polling.
+// Geen “wachten op de server”: de client start zelf meteen meerdere pogingen bij koude start (lege snapshot).
 import { useEffect, useRef, useState } from 'react'
-import { LOADER_MIN_VISIBLE_MS } from '../constants/uiTiming'
+import {
+  LOADER_MIN_VISIBLE_MS,
+  SNAPSHOT_STARTUP_MAX_ATTEMPTS,
+  SNAPSHOT_STARTUP_RETRY_BASE_MS,
+} from '../constants/uiTiming'
 import { CACHE_KEY_DRIVER_STANDINGS, readCache, writeCache } from '../services/cacheService'
+
 const PAGE_DATA_POLL_MS = 30000
 
 export function useF1Drivers() {
@@ -13,45 +18,94 @@ export function useF1Drivers() {
   const [drivers, setDrivers] = useState(initialDrivers)
   const [seasonYear, setSeasonYear] = useState(cached?.seasonStatsYear ?? null)
   const [loading, setLoading] = useState(initialDrivers.length === 0)
-  const [refreshing, setRefreshing] = useState(initialDrivers.length > 0)
   const [error, setError] = useState(null)
-  const requestRunningRef = useRef(false)
 
   useEffect(() => {
     let pollTimer = null
-    let currentController = null
+    let activeController = null
     let cancelled = false
 
     async function loadDrivers(signal) {
-      if (requestRunningRef.current) return
-      requestRunningRef.current = true
       const hadCachedData = (cachedRef.current?.seasonStats?.length ?? 0) > 0
       const refreshStartedAt = Date.now()
 
       if (!hadCachedData) {
         setLoading(true)
         setError(null)
-      } else {
-        setRefreshing(true)
       }
 
+      const coldStart = !hadCachedData
+      const maxAttempts = coldStart ? SNAPSHOT_STARTUP_MAX_ATTEMPTS : 1
+      let list = []
+      let year = null
+      let lastError = null
+
       try {
-        const res = await fetch('/api/dashboard-snapshot', { signal })
-        if (!res.ok) throw new Error('Coureurs konden niet worden geladen.')
-        const data = await res.json()
-        const list = Array.isArray(data?.seasonStats) ? data.seasonStats : []
-        const year = data?.seasonStatsYear ?? null
-        setDrivers(list)
-        setSeasonYear(year)
-        setError(null)
-        writeCache(CACHE_KEY_DRIVER_STANDINGS, {
-          seasonStats: list,
-          seasonStatsYear: year,
-        })
-        cachedRef.current = {
-          ...cachedRef.current,
-          seasonStats: list,
-          seasonStatsYear: year,
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+          if (signal.aborted) break
+          if (attempt > 0) {
+            await new Promise((r) =>
+              setTimeout(
+                r,
+                Math.min(800, SNAPSHOT_STARTUP_RETRY_BASE_MS * attempt)
+              )
+            )
+          }
+          try {
+            const res = await fetch('/api/dashboard-snapshot', { signal })
+            if (!res.ok) throw new Error('Coureurs konden niet worden geladen.')
+            const data = await res.json()
+            list = Array.isArray(data?.seasonStats) ? data.seasonStats : []
+            year = data?.seasonStatsYear ?? null
+            lastError = null
+            if (list.length > 0) break
+            if (!coldStart) break
+          } catch (err) {
+            if (err?.name === 'AbortError') break
+            lastError = err
+            if (!coldStart || attempt === maxAttempts - 1) break
+          }
+        }
+
+        if (signal.aborted) return
+
+        if (list.length > 0) {
+          setDrivers(list)
+          setSeasonYear(year)
+          setError(null)
+          writeCache(CACHE_KEY_DRIVER_STANDINGS, {
+            seasonStats: list,
+            seasonStatsYear: year,
+          })
+          cachedRef.current = {
+            ...cachedRef.current,
+            seasonStats: list,
+            seasonStatsYear: year,
+          }
+        } else if (coldStart && lastError) {
+          setDrivers([])
+          setError(lastError?.message || 'Onbekende fout bij laden coureurs.')
+        } else if (coldStart) {
+          setDrivers([])
+          setSeasonYear(year)
+          setError(null)
+        } else if (lastError) {
+          setError(null)
+        } else {
+          setDrivers(list)
+          setSeasonYear(year)
+          setError(null)
+          if (list.length > 0) {
+            writeCache(CACHE_KEY_DRIVER_STANDINGS, {
+              seasonStats: list,
+              seasonStatsYear: year,
+            })
+            cachedRef.current = {
+              ...cachedRef.current,
+              seasonStats: list,
+              seasonStatsYear: year,
+            }
+          }
         }
       } catch (err) {
         if (err?.name === 'AbortError') return
@@ -64,28 +118,34 @@ export function useF1Drivers() {
           if (elapsed < LOADER_MIN_VISIBLE_MS) {
             await new Promise((r) => setTimeout(r, LOADER_MIN_VISIBLE_MS - elapsed))
           }
+          setLoading(false)
         }
-        setLoading(false)
-        setRefreshing(false)
-        requestRunningRef.current = false
       }
     }
 
-    async function tick() {
+    async function runPoll() {
       if (cancelled) return
-      currentController = new AbortController()
-      await loadDrivers(currentController.signal)
-      if (cancelled) return
-      pollTimer = window.setTimeout(tick, PAGE_DATA_POLL_MS)
+      activeController = new AbortController()
+      await loadDrivers(activeController.signal)
+      if (!cancelled) {
+        pollTimer = window.setTimeout(runPoll, PAGE_DATA_POLL_MS)
+      }
     }
 
-    tick()
+    ;(async function initialFetch() {
+      activeController = new AbortController()
+      await loadDrivers(activeController.signal)
+      if (!cancelled) {
+        pollTimer = window.setTimeout(runPoll, PAGE_DATA_POLL_MS)
+      }
+    })()
+
     return () => {
       cancelled = true
       if (pollTimer) clearTimeout(pollTimer)
-      currentController?.abort()
+      activeController?.abort()
     }
   }, [])
 
-  return { drivers, seasonYear, loading, refreshing, error }
+  return { drivers, seasonYear, loading, error }
 }
