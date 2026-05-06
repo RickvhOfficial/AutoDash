@@ -36,7 +36,8 @@ export function computeWeatherRetryDelay(failureStreak) {
   return Math.min(WEATHER_RETRY_BASE_MS * (2 ** (failureStreak - 1)), WEATHER_RETRY_MAX_MS)
 }
 
-const OPEN_METEO_FORECAST = 'https://api.open-meteo.com/v1/forecast'
+/** Weer voor circuitweerpagina: via eigen backend (cache + zelfde origin als overige /api-calls). */
+const CIRCUIT_WEATHER_API = '/api/circuit-weather'
 
 /** WMO weathercode → emoji (opdracht-buckets). */
 export function weatherCodeToIcon(code) {
@@ -91,18 +92,16 @@ export function formatWindDirectionDegrees(degrees) {
  * 7-daagse forecast + actueel weer (één request) voor circuitcoördinaten.
  * @param {AbortSignal} [signal]
  */
-export async function getCircuitWeather(lat, lon, signal) {
-  const daily =
-    'temperature_2m_max,temperature_2m_min,precipitation_sum,windspeed_10m_max,weathercode'
-  const current =
-    'temperature_2m,relative_humidity_2m,precipitation,weather_code,wind_speed_10m,wind_direction_10m'
-  const url =
-    `${OPEN_METEO_FORECAST}?latitude=${lat}&longitude=${lon}` +
-    `&current=${current}` +
-    `&daily=${daily}` +
-    '&timezone=auto&forecast_days=7'
-
-  const response = await fetch(url, signal ? { signal } : undefined)
+export async function getCircuitWeather(lat, lon, signal, forceRefresh = false) {
+  const params = new URLSearchParams({
+    latitude: String(lat),
+    longitude: String(lon),
+    ...(forceRefresh ? { refresh: '1' } : {}),
+  })
+  const response = await fetch(`${CIRCUIT_WEATHER_API}?${params}`, {
+    ...(signal ? { signal } : {}),
+    ...(forceRefresh ? { cache: 'no-store' } : {}),
+  })
   if (!response.ok) throw new Error('Weerdata niet beschikbaar')
   return response.json()
 }
