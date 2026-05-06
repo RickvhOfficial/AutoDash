@@ -1,0 +1,17 @@
+export const circuits = [
+  { name: 'Bahrain International Circuit', country: 'Bahrain', lat: 26.032, lon: 50.511 },
+  { name: 'Jeddah Corniche Circuit', country: 'Saudi-Arabië', lat: 21.6319, lon: 39.1044 },
+  { name: 'Albert Park Circuit', country: 'Australië', lat: -37.8497, lon: 144.968 },
+  { name: 'Suzuka Circuit', country: 'Japan', lat: 34.8431, lon: 136.541 },
+  { name: 'Circuit de Monaco', country: 'Monaco', lat: 43.7347, lon: 7.4205 },
+  { name: 'Circuit de Barcelona-Catalunya', country: 'Spanje', lat: 41.57, lon: 2.261 },
+  { name: 'Silverstone Circuit', country: 'Groot-Brittannië', lat: 52.0786, lon: -1.0169 },
+  { name: 'Hungaroring', country: 'Hongarije', lat: 47.5789, lon: 19.2486 },
+  { name: 'Spa-Francorchamps', country: 'België', lat: 50.4372, lon: 5.9714 },
+  { name: 'Monza Circuit', country: 'Italië', lat: 45.6156, lon: 9.2811 },
+  { name: 'Circuit of the Americas', country: 'VS', lat: 30.1328, lon: -97.6411 },
+  { name: 'Autodromo Hermanos Rodriguez', country: 'Mexico', lat: 19.4042, lon: -99.0907 },
+  { name: 'Interlagos Circuit', country: 'Brazilië', lat: -23.7036, lon: -46.6997 },
+  { name: 'Yas Marina Circuit', country: 'Abu Dhabi', lat: 24.4672, lon: 54.6031 },
+  { name: 'Zandvoort Circuit', country: 'Nederland 🇳🇱', lat: 52.3888, lon: 4.5409 },
+]
