@@ -280,12 +280,14 @@ export default function Home() {
                     )}
                     {seasonStats.data.length > 0 && (
                       <ul className="scrollbar-red mt-2 max-h-40 space-y-1 overflow-y-auto text-xs text-slate-100">
-                        {seasonStats.data.map((entry) => (
+                        {seasonStats.data.map((entry, idx) => (
                           <li
-                            key={`${entry.position}-${entry.name}`}
+                            key={entry.driver_number ?? `${entry.name}-${idx}`}
                             className="grid grid-cols-[1.5rem_1fr_auto] items-center gap-2"
                           >
-                            <span className="text-slate-200">{entry.position}</span>
+                            <span className="text-slate-200">
+                              {entry.position ?? idx + 1}
+                            </span>
                             <div className="flex min-w-0 items-center gap-2">
                               {entry.flag ? (
                                 <img

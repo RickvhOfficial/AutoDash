@@ -24,6 +24,8 @@ const OPEN_METEO_URL =
 const OPENF1_TTL_MS = 30 * 60 * 1000
 const WEATHER_TTL_MS = 30 * 1000
 const RACE_CALENDAR_TTL_MS = 15 * 60 * 1000
+/** Circuit-weerpagina: server-side cache per lat/lon (Open-Meteo forecast). */
+const CIRCUIT_WEATHER_TTL_MS = 15 * 60 * 1000
 
 const DRIVER_NATIONALITIES = {
   1: 'nl',
@@ -157,6 +159,9 @@ try {
 }
 let dashboardInFlightPromise = null
 
+/** @type {Map<string, { updatedAt: number, data: unknown }>} */
+const circuitWeatherCache = new Map()
+
 function hasEnrichedSeasonStats(openf1Data) {
   const seasonStats = openf1Data?.seasonStats
   if (!Array.isArray(seasonStats) || seasonStats.length === 0) return true
@@ -283,31 +288,65 @@ async function fetchOpenF1Snapshot() {
       .sort((a, b) => Number(a.number) - Number(b.number))
 
     const driverByNumber = new Map((Array.isArray(driversData) ? driversData : []).map((d) => [d.driver_number, d]))
-    seasonStats = (Array.isArray(standingsData) ? standingsData : [])
-      .map((row) => {
-        const driver = driverByNumber.get(row.driver_number)
-        const fullName = driver
-          ? `${driver.first_name ?? ''} ${driver.last_name ?? ''}`.trim() || driver.broadcast_name
-          : `#${row.driver_number}`
-        return {
-          position: row.position_current ?? row.position_start ?? null,
-          driver_number: row.driver_number,
-          name: fullName,
-          full_name: fullName,
-          name_acronym: driver?.name_acronym || null,
-          team_name: driver?.team_name || null,
-          team_colour: driver?.team_colour || null,
-          country_code:
-            driver?.country_code ||
-            DRIVER_COUNTRY_CODES[row.driver_number] ||
-            null,
-          headshot_url: driver?.headshot_url || null,
-          points: row.points_current ?? row.points_start ?? 0,
-          flag: driverFlag(row.driver_number),
-        }
+
+    function mapChampionshipRow(row) {
+      const driver = driverByNumber.get(row.driver_number)
+      const fullName = driver
+        ? `${driver.first_name ?? ''} ${driver.last_name ?? ''}`.trim() || driver.broadcast_name
+        : `#${row.driver_number}`
+      return {
+        position: row.position_current ?? row.position_start ?? null,
+        driver_number: row.driver_number,
+        name: fullName,
+        full_name: fullName,
+        name_acronym: driver?.name_acronym || null,
+        team_name: driver?.team_name || null,
+        team_colour: driver?.team_colour || null,
+        country_code:
+          driver?.country_code ||
+          DRIVER_COUNTRY_CODES[row.driver_number] ||
+          null,
+        headshot_url: driver?.headshot_url || null,
+        points: row.points_current ?? row.points_start ?? 0,
+        flag: driverFlag(row.driver_number),
+      }
+    }
+
+    const standingsRows = (Array.isArray(standingsData) ? standingsData : []).filter(
+      (row) => row?.driver_number != null
+    )
+    const seenNumbers = new Set(standingsRows.map((r) => r.driver_number))
+    seasonStats = standingsRows.map(mapChampionshipRow)
+
+    // Soms ontbreekt een coureur in championship_drivers (of beide posities zijn null); drivers-sessie is bron voor 22 startnummers.
+    for (const d of Array.isArray(driversData) ? driversData : []) {
+      if (d?.driver_number == null || seenNumbers.has(d.driver_number)) continue
+      seenNumbers.add(d.driver_number)
+      const fullName =
+        `${d.first_name ?? ''} ${d.last_name ?? ''}`.trim() || d.broadcast_name || 'Onbekend'
+      seasonStats.push({
+        position: null,
+        driver_number: d.driver_number,
+        name: fullName,
+        full_name: fullName,
+        name_acronym: d.name_acronym || null,
+        team_name: d.team_name || null,
+        team_colour: d.team_colour || null,
+        country_code: d.country_code || DRIVER_COUNTRY_CODES[d.driver_number] || null,
+        headshot_url: d.headshot_url || null,
+        points: 0,
+        flag: driverFlag(d.driver_number),
       })
-      .filter((r) => r.position !== null)
-      .sort((a, b) => Number(a.position) - Number(b.position))
+    }
+
+    seasonStats.sort((a, b) => {
+      const ap = a.position
+      const bp = b.position
+      if (ap != null && bp != null) return Number(ap) - Number(bp)
+      if (ap != null) return -1
+      if (bp != null) return 1
+      return Number(a.driver_number) - Number(b.driver_number)
+    })
   }
 
   const nextRace = upcomingRace
@@ -635,6 +674,60 @@ app.get('/api/dashboard-snapshot', async (_req, res) => {
         detail: error instanceof Error ? error.message : 'Unknown error',
       })
     }
+  }
+})
+
+// Open-Meteo 7-daagse + actueel weer voor circuitcoördinaten (proxy + servercache + browser-cache headers).
+app.get('/api/circuit-weather', async (req, res) => {
+  const lat = Number(req.query.latitude)
+  const lon = Number(req.query.longitude)
+  if (
+    !Number.isFinite(lat) ||
+    !Number.isFinite(lon) ||
+    lat < -90 ||
+    lat > 90 ||
+    lon < -180 ||
+    lon > 180
+  ) {
+    res.status(400).json({ error: 'Ongeldige breedte- of lengtegraad.' })
+    return
+  }
+
+  const key = `${lat.toFixed(5)},${lon.toFixed(5)}`
+  const nowTs = Date.now()
+  const bypassServerCache = req.query.refresh === '1'
+  const hit = circuitWeatherCache.get(key)
+  if (!bypassServerCache && hit && nowTs - hit.updatedAt < CIRCUIT_WEATHER_TTL_MS) {
+    res.setHeader('Cache-Control', 'public, max-age=300')
+    res.json(hit.data)
+    return
+  }
+
+  const daily =
+    'temperature_2m_max,temperature_2m_min,precipitation_sum,windspeed_10m_max,weathercode'
+  const current =
+    'temperature_2m,relative_humidity_2m,precipitation,weather_code,wind_speed_10m,wind_direction_10m'
+  const url =
+    `${OPEN_METEO_URL}?latitude=${lat}&longitude=${lon}` +
+    `&current=${current}` +
+    `&daily=${daily}` +
+    '&timezone=auto&forecast_days=7'
+
+  try {
+    const data = await requestJsonWithRetry(url)
+    circuitWeatherCache.set(key, { updatedAt: nowTs, data })
+    res.setHeader('Cache-Control', 'public, max-age=300')
+    res.json(data)
+  } catch (error) {
+    if (hit?.data) {
+      res.setHeader('Cache-Control', 'no-store')
+      res.json({ ...hit.data, stale: true })
+      return
+    }
+    res.status(502).json({
+      error: 'Weerdata tijdelijk niet beschikbaar.',
+      detail: error instanceof Error ? error.message : 'Unknown error',
+    })
   }
 })
 

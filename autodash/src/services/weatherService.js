@@ -36,6 +36,76 @@ export function computeWeatherRetryDelay(failureStreak) {
   return Math.min(WEATHER_RETRY_BASE_MS * (2 ** (failureStreak - 1)), WEATHER_RETRY_MAX_MS)
 }
 
+/** Weer voor circuitweerpagina: via eigen backend (cache + zelfde origin als overige /api-calls). */
+const CIRCUIT_WEATHER_API = '/api/circuit-weather'
+
+/** WMO weathercode → emoji (opdracht-buckets). */
+export function weatherCodeToIcon(code) {
+  const c = Number(code)
+  if (!Number.isFinite(c)) return '⛅'
+  if (c === 0) return '☀️'
+  if (c >= 1 && c <= 3) return '⛅'
+  if (c >= 51 && c <= 67) return '🌧️'
+  if (c >= 71 && c <= 77) return '❄️'
+  if (c >= 80 && c <= 99) return '⛈️'
+  return '⛅'
+}
+
+/** Korte Nederlandse omschrijving bij WMO-code. */
+export function weatherCodeToLabelNl(code) {
+  const c = Number(code)
+  if (!Number.isFinite(c)) return 'Onbekend'
+  if (c === 0) return 'Helder'
+  if (c >= 1 && c <= 3) return 'Bewolkt'
+  if (c >= 51 && c <= 67) return 'Regen'
+  if (c >= 71 && c <= 77) return 'Sneeuw'
+  if (c >= 80 && c <= 99) return 'Onweer'
+  return 'Deels bewolkt'
+}
+
+/** Windrichting in kompasletters (NL gangbaar). */
+export function formatWindDirectionDegrees(degrees) {
+  if (!Number.isFinite(degrees)) return '—'
+  const labels = [
+    'N',
+    'NNO',
+    'NO',
+    'ONO',
+    'O',
+    'OZO',
+    'ZO',
+    'ZZO',
+    'Z',
+    'ZZW',
+    'ZW',
+    'WZW',
+    'W',
+    'WNW',
+    'NW',
+    'NNW',
+  ]
+  const i = Math.round(degrees / 22.5) % 16
+  return labels[i]
+}
+
+/**
+ * 7-daagse forecast + actueel weer (één request) voor circuitcoördinaten.
+ * @param {AbortSignal} [signal]
+ */
+export async function getCircuitWeather(lat, lon, signal, forceRefresh = false) {
+  const params = new URLSearchParams({
+    latitude: String(lat),
+    longitude: String(lon),
+    ...(forceRefresh ? { refresh: '1' } : {}),
+  })
+  const response = await fetch(`${CIRCUIT_WEATHER_API}?${params}`, {
+    ...(signal ? { signal } : {}),
+    ...(forceRefresh ? { cache: 'no-store' } : {}),
+  })
+  if (!response.ok) throw new Error('Weerdata niet beschikbaar')
+  return response.json()
+}
+
 // Bepaalt coordinaten (geocoding of fallback-map) en haalt Open-Meteo current weather op.
 export async function fetchWeatherForRace({
   raceData,

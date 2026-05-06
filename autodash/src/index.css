@@ -1,4 +1,4 @@
-﻿/* Tailwind lagen: reset/typografie, eigen componenten (indien nodig), utilities. */
+/* Tailwind lagen: reset/typografie, eigen componenten (indien nodig), utilities. */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -12,6 +12,7 @@
 }
 .scrollbar-red::-webkit-scrollbar {
   width: 5px;
+  height: 5px;
 }
 .scrollbar-red::-webkit-scrollbar-button {
   width: 0;
@@ -27,6 +28,7 @@
   border-radius: 3px;
   border: none;
   min-height: 36px;
+  min-width: 36px;
 }
 
 body {

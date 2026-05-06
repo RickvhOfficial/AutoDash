@@ -91,21 +91,6 @@ export function useF1Drivers() {
           setError(null)
         } else if (lastError) {
           setError(null)
-        } else {
-          setDrivers(list)
-          setSeasonYear(year)
-          setError(null)
-          if (list.length > 0) {
-            writeCache(CACHE_KEY_DRIVER_STANDINGS, {
-              seasonStats: list,
-              seasonStatsYear: year,
-            })
-            cachedRef.current = {
-              ...cachedRef.current,
-              seasonStats: list,
-              seasonStatsYear: year,
-            }
-          }
         }
       } catch (err) {
         if (err?.name === 'AbortError') return

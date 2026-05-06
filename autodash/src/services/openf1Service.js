@@ -179,18 +179,37 @@ export function mapDrivers(driversData) {
 export function mapStandings(standingsData, driversData) {
   if (!Array.isArray(standingsData) || !Array.isArray(driversData)) return []
   const driverByNumber = new Map(driversData.map((d) => [d.driver_number, d]))
-  return standingsData
-    .map((row) => {
-      const driver = driverByNumber.get(row.driver_number)
-      return {
-        position: row.position_current ?? row.position_start ?? null,
-        name: driver
-          ? `${driver.first_name ?? ''} ${driver.last_name ?? ''}`.trim() || driver.broadcast_name
-          : `#${row.driver_number}`,
-        points: row.points_current ?? row.points_start ?? 0,
-        flag: driverFlag(row.driver_number),
-      }
+  const standingsRows = standingsData.filter((row) => row?.driver_number != null)
+  const seenNumbers = new Set(standingsRows.map((r) => r.driver_number))
+  const rows = standingsRows.map((row) => {
+    const driver = driverByNumber.get(row.driver_number)
+    return {
+      position: row.position_current ?? row.position_start ?? null,
+      driver_number: row.driver_number,
+      name: driver
+        ? `${driver.first_name ?? ''} ${driver.last_name ?? ''}`.trim() || driver.broadcast_name
+        : `#${row.driver_number}`,
+      points: row.points_current ?? row.points_start ?? 0,
+      flag: driverFlag(row.driver_number),
+    }
+  })
+  for (const d of driversData) {
+    if (d?.driver_number == null || seenNumbers.has(d.driver_number)) continue
+    seenNumbers.add(d.driver_number)
+    rows.push({
+      position: null,
+      driver_number: d.driver_number,
+      name:
+        `${d.first_name ?? ''} ${d.last_name ?? ''}`.trim() || d.broadcast_name || 'Onbekend',
+      points: 0,
+      flag: driverFlag(d.driver_number),
     })
-    .filter((r) => r.position !== null)
-    .sort((a, b) => Number(a.position) - Number(b.position))
+  }
+  rows.sort((a, b) => {
+    if (a.position != null && b.position != null) return Number(a.position) - Number(b.position)
+    if (a.position != null) return -1
+    if (b.position != null) return 1
+    return Number(a.driver_number) - Number(b.driver_number)
+  })
+  return rows
 }

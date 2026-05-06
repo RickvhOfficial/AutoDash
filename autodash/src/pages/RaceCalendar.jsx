@@ -59,6 +59,17 @@ function getRaceStartTime(session) {
   return start.getTime()
 }
 
+function getRaceKey(session) {
+  return `${session?.sessionKey ?? session?.meetingName}-${session?.dateStart ?? ''}`
+}
+
+function getDisplayStatus(session, nextRaceKey) {
+  if (!session) return 'Aankomend'
+  if (session.status === 'Dit weekend') return 'Dit weekend'
+  if (session.status === 'Aankomend' && getRaceKey(session) === nextRaceKey) return 'Eerst Volgende'
+  return session.status || 'Aankomend'
+}
+
 export default function RaceCalendar() {
   const cachedRef = useRef(readCache(CACHE_KEY_RACE_CALENDAR))
   const cached = cachedRef.current
@@ -143,17 +154,6 @@ export default function RaceCalendar() {
         setError('')
       } else if (lastErr) {
         setError('')
-      } else {
-        setRaces(enrichedRaces)
-        setSeasonYear(yearOut)
-        setStale(staleOut)
-        if (enrichedRaces.length > 0) {
-          writeCache(CACHE_KEY_RACE_CALENDAR, {
-            races: enrichedRaces,
-            seasonYear: yearOut,
-          })
-          cachedRef.current = { races: enrichedRaces, seasonYear: yearOut }
-        }
       }
     } catch (err) {
       if (err?.name !== 'AbortError' && !hadCachedData) {
@@ -211,9 +211,7 @@ export default function RaceCalendar() {
   const nextRace = races
     .filter((session) => getRaceStartTime(session) >= todayStart)
     .sort((a, b) => getRaceStartTime(a) - getRaceStartTime(b))[0]
-  const nextRaceKey = nextRace
-    ? `${nextRace.sessionKey ?? nextRace.meetingName}-${nextRace.dateStart ?? ''}`
-    : null
+  const nextRaceKey = nextRace ? getRaceKey(nextRace) : null
 
   return (
     <section className="flex min-h-0 flex-1 flex-col bg-slate-950 text-slate-100">
@@ -298,10 +296,9 @@ export default function RaceCalendar() {
               <div className="space-y-3 bg-slate-950/60 px-2 py-3">
                 {races.map((session, idx) => (
                   <div
-                    key={`${session.sessionKey ?? session.meetingName}-${session.dateStart ?? ''}`}
+                    key={getRaceKey(session)}
                     className={`relative z-0 grid min-h-[6.5rem] grid-cols-[1.35fr_2.4fr_1.35fr_1fr] items-center gap-7 rounded-xl border px-7 py-6 text-base text-slate-100 transition-transform duration-200 ease-out ${
-                      `${session.sessionKey ?? session.meetingName}-${session.dateStart ?? ''}` ===
-                      nextRaceKey
+                      getRaceKey(session) === nextRaceKey
                         ? 'border-[#ff1e00] bg-[#23151a] shadow-[0_0_20px_rgba(255,30,0,0.2)]'
                         : session.status === 'Voorbij'
                           ? 'border-slate-800 bg-gray-900/20 text-slate-500 shadow-[inset_0_0_0_9999px_rgba(148,163,184,0.08)]'
@@ -343,15 +340,19 @@ export default function RaceCalendar() {
                       <span className="truncate text-[0.95rem]">{session.countryName}</span>
                     </span>
                     <span className="text-center">
+                      {(() => {
+                        const displayStatus = getDisplayStatus(session, nextRaceKey)
+                        return (
                       <span
                         className={getStatusClass(
-                          session.status,
-                          `${session.sessionKey ?? session.meetingName}-${session.dateStart ?? ''}` ===
-                            nextRaceKey
+                          displayStatus,
+                          getRaceKey(session) === nextRaceKey
                         )}
                       >
-                        {session.status}
+                        {displayStatus}
                       </span>
+                        )
+                      })()}
                     </span>
                   </div>
                 ))}
@@ -362,11 +363,10 @@ export default function RaceCalendar() {
             <div className="grid gap-4 lg:hidden sm:grid-cols-2">
               {races.map((session) => (
                 <RaceCard
-                  key={`${session.sessionKey ?? session.meetingName}-${session.dateStart ?? ''}`}
-                  session={session}
+                  key={getRaceKey(session)}
+                  session={{ ...session, status: getDisplayStatus(session, nextRaceKey) }}
                   isNextRace={
-                    `${session.sessionKey ?? session.meetingName}-${session.dateStart ?? ''}` ===
-                    nextRaceKey
+                    getRaceKey(session) === nextRaceKey
                   }
                 />
               ))}
