@@ -2,6 +2,7 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import LoadingSpinner from '../components/LoadingSpinner'
+import PageMainContent from '../components/PageMainContent'
 import { useDashboardData } from '../hooks/useDashboardData'
 
 const HERO_IMG =
@@ -120,14 +121,10 @@ export default function Home() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-slate-950 text-slate-100">
-      <section className="relative flex min-h-0 flex-1 flex-col justify-center px-6 py-10 md:px-10">
-        {initialLoading && (
-          <div className="mx-auto w-full max-w-6xl">
-            <LoadingSpinner message="Dashboard data laden..." />
-          </div>
-        )}
+      <PageMainContent>
+        {initialLoading && <LoadingSpinner message="Dashboard data laden..." />}
         {!initialLoading && (
-          <div className="mx-auto w-full max-w-6xl">
+          <>
             <div className="grid items-stretch gap-6 lg:grid-cols-[2fr_1fr]">
               <div className="grid gap-6 sm:grid-cols-2">
                 <Link to="/races" className={`${cardClass} min-h-44 cursor-pointer`}>
@@ -347,7 +344,7 @@ export default function Home() {
                 </div>
               </Link>
             </div>
-          </div>
+          </>
         )}
         {!initialLoading && refreshing && (
           <div className="pointer-events-none absolute right-2 top-2 z-20 md:right-10 md:top-10">
@@ -356,7 +353,7 @@ export default function Home() {
             </div>
           </div>
         )}
-      </section>
+      </PageMainContent>
     </div>
   )
 }

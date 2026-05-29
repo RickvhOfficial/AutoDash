@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import ErrorMessage from '../components/ErrorMessage'
 import LoadingSpinner from '../components/LoadingSpinner'
+import PageMainContent from '../components/PageMainContent'
 import RaceCard from '../components/RaceCard'
 import { HOME_HERO_HEIGHT_PX } from './Home'
 import {
@@ -234,14 +235,10 @@ export default function RaceCalendar() {
         </div>
       </div>
 
-      <section className="relative flex min-h-0 flex-1 flex-col justify-center px-6 py-10 md:pl-[5rem] md:pr-[3.5rem] md:py-12 lg:py-14">
-        {loading && (
-          <div className="mx-auto w-full max-w-6xl">
-            <LoadingSpinner message="Racekalender laden..." />
-          </div>
-        )}
+      <PageMainContent>
+        {loading && <LoadingSpinner message="Racekalender laden..." />}
         {!loading && (
-          <div className="mx-auto w-full max-w-6xl">
+          <>
             <div className="mb-6 flex flex-wrap items-center justify-between gap-2">
               {stale && (
                 <p className="rounded-md border border-red-500/60 bg-red-600/10 px-3 py-1 text-xs text-red-200">
@@ -373,9 +370,9 @@ export default function RaceCalendar() {
             </div>
           </div>
             )}
-          </div>
+          </>
         )}
-      </section>
+      </PageMainContent>
     </section>
   )
 }

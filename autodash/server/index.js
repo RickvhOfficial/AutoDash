@@ -5,6 +5,8 @@ import cors from 'cors'
 import { readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
+import { resolveVinDecode, resolveVehicleSearch, resolveMakeEnrichment, applyEnrichment } from '../src/services/vehicleService.js'
+import { preloadCatalogBrands } from '../src/services/euCarCatalog.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const PERSIST_FILE = join(__dirname, 'cache.json')
@@ -619,6 +621,7 @@ async function getHourlyPhotos() {
 }
 
 app.use(cors())
+app.use(express.json())
 
 app.get('/health', (_req, res) => {
   res.json({ ok: true })
@@ -757,9 +760,73 @@ app.get('/api/race-calendar', async (_req, res) => {
   }
 })
 
+// VIN-decoder: DB.VIN (Europa) + NHTSA (motor/PK waar beschikbaar).
+app.get('/api/vin-decode', async (req, res) => {
+  try {
+    const row = await resolveVinDecode(String(req.query.vin || ''))
+    res.setHeader('Cache-Control', 'private, max-age=300')
+    res.json(row)
+  } catch (error) {
+    res.status(400).json({
+      error: error instanceof Error ? error.message : 'VIN kon niet worden gedecodeerd.',
+    })
+  }
+})
+
+const SEARCH_ENRICH_BATCH = 30
+
+// Merk/model-zoeken: NHTSA + wereldwijd catalogus (236+ merken).
+app.get('/api/models-by-make', async (req, res) => {
+  try {
+    const q = String(req.query.q || '').trim()
+    const make = String(req.query.make || '').trim()
+    const modelFilter = String(req.query.model || '').trim()
+    const query = q || (modelFilter ? `${make} ${modelFilter}` : make)
+    const yearRaw = req.query.year
+    const year = yearRaw ? Number(yearRaw) : null
+    if (!query) {
+      return res.status(400).json({ error: 'Voer een merk of model in.' })
+    }
+    if (yearRaw && (!Number.isFinite(year) || year < 1984)) {
+      return res.status(400).json({ error: 'Ongeldig jaartal.' })
+    }
+    let rows = await resolveVehicleSearch(query, year)
+    if (rows.length) {
+      const enrichment = await resolveMakeEnrichment('', rows.slice(0, SEARCH_ENRICH_BATCH))
+      rows = applyEnrichment(rows, enrichment)
+    }
+    res.setHeader('Cache-Control', 'private, max-age=600')
+    res.json(rows)
+  } catch (error) {
+    res.status(400).json({
+      error: error instanceof Error ? error.message : 'Voertuigdata kon niet worden geladen.',
+    })
+  }
+})
+
+// Specs aanvullen via EPA (per pagina, voor rijen buiten de eerste batch).
+app.post('/api/models-enrich', async (req, res) => {
+  try {
+    const rows = Array.isArray(req.body?.rows) ? req.body.rows : []
+    if (!rows.length) {
+      return res.status(400).json({ error: 'Geen rijen om te verrijken.' })
+    }
+    const enrichment = await resolveMakeEnrichment('', rows)
+    res.setHeader('Cache-Control', 'private, max-age=600')
+    res.json(enrichment)
+  } catch (error) {
+    res.status(400).json({
+      error: error instanceof Error ? error.message : 'Specs konden niet worden geladen.',
+    })
+  }
+})
+
 const server = app.listen(PORT, () => {
   console.log(`AutoDash API running on http://localhost:${PORT}`)
-  // Warm up cache so the first user request is never cold.
+  console.log('[Vehicle] Zoeken met EPA-verrijking (v2) actief')
+  preloadCatalogBrands().catch((err) =>
+    console.warn('[Startup] Catalog preload failed:', err.message)
+  )
   getDashboardSnapshot().catch((err) =>
     console.warn('[Startup] Dashboard snapshot warmup failed:', err.message)
   )

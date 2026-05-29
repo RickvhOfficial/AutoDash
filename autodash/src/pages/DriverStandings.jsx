@@ -4,6 +4,7 @@ import DriverCard from '../components/DriverCard'
 import DriverHeadshot from '../components/DriverHeadshot'
 import ErrorMessage from '../components/ErrorMessage'
 import LoadingSpinner from '../components/LoadingSpinner'
+import PageMainContent from '../components/PageMainContent'
 import { useF1Drivers } from '../hooks/useF1Drivers'
 import { HOME_HERO_HEIGHT_PX } from './Home'
 
@@ -83,14 +84,10 @@ export default function DriverStandings() {
         </div>
       </div>
 
-      <section className="relative flex min-h-0 flex-1 flex-col justify-center px-6 py-10 md:pl-[5rem] md:pr-[3.5rem] md:py-12 lg:py-14">
-        {loading && (
-          <div className="mx-auto w-full max-w-6xl">
-            <LoadingSpinner message="Coureurs laden..." />
-          </div>
-        )}
+      <PageMainContent>
+        {loading && <LoadingSpinner message="Coureurs laden..." />}
         {!loading && (
-          <div className="mx-auto w-full max-w-6xl">
+          <>
             <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <label className="relative flex w-full max-w-md items-center">
                 <span className="sr-only">Zoek op naam of team</span>
@@ -210,9 +207,9 @@ export default function DriverStandings() {
             </div>
           </div>
             )}
-          </div>
+          </>
         )}
-      </section>
+      </PageMainContent>
     </section>
   )
 }
