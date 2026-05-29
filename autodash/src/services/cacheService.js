@@ -1,7 +1,7 @@
 // LocalStorage cachehelpers voor dashboarddata en hourly Unsplash-afbeeldingen.
-export const CACHE_KEY = 'autodash_cache_site_v1'
-export const CACHE_KEY_RACE_CALENDAR = 'autodash_cache_race_calendar_v1'
-export const CACHE_KEY_DRIVER_STANDINGS = 'autodash_cache_driver_standings_v1'
+export const CACHE_KEY = 'autodash_cache_site_v3'
+export const CACHE_KEY_RACE_CALENDAR = 'autodash_cache_race_calendar_v2'
+export const CACHE_KEY_DRIVER_STANDINGS = 'autodash_cache_driver_standings_v3'
 /** Per circuit: `{ circuits: { [circuitName]: { weather, updatedAt } } }` */
 export const CACHE_KEY_CIRCUIT_WEATHER = 'autodash_cache_circuit_weather_v1'
 export const CACHE_MAX_AGE_MS = 60 * 60 * 1000

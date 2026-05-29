@@ -7,6 +7,11 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { resolveVinDecode, resolveVehicleSearch, resolveMakeEnrichment, applyEnrichment } from '../src/services/vehicleService.js'
 import { preloadCatalogBrands } from '../src/services/euCarCatalog.js'
+import {
+  driverFlagUrl,
+  enrichDriverNationality,
+  resolveDriverCountryCode,
+} from '../src/data/driverNationalities.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const PERSIST_FILE = join(__dirname, 'cache.json')
@@ -29,56 +34,6 @@ const RACE_CALENDAR_TTL_MS = 15 * 60 * 1000
 /** Circuit-weerpagina: server-side cache per lat/lon (Open-Meteo forecast). */
 const CIRCUIT_WEATHER_TTL_MS = 15 * 60 * 1000
 
-const DRIVER_NATIONALITIES = {
-  1: 'nl',
-  3: 'nl',
-  4: 'gb',
-  5: 'br',
-  6: 'fr',
-  10: 'fr',
-  11: 'mx',
-  12: 'it',
-  14: 'es',
-  16: 'mc',
-  18: 'ca',
-  23: 'th',
-  27: 'de',
-  30: 'nz',
-  31: 'fr',
-  41: 'gb',
-  43: 'ar',
-  44: 'gb',
-  55: 'es',
-  63: 'gb',
-  77: 'fi',
-  81: 'au',
-  87: 'gb',
-}
-const DRIVER_COUNTRY_CODES = {
-  1: 'NED',
-  3: 'NED',
-  4: 'GBR',
-  5: 'BRA',
-  6: 'FRA',
-  10: 'FRA',
-  11: 'MEX',
-  12: 'ITA',
-  14: 'ESP',
-  16: 'MON',
-  18: 'CAN',
-  23: 'THA',
-  27: 'DEU',
-  30: 'NZL',
-  31: 'FRA',
-  41: 'GBR',
-  43: 'ARG',
-  44: 'GBR',
-  55: 'ESP',
-  63: 'GBR',
-  77: 'FIN',
-  81: 'AUS',
-  87: 'GBR',
-}
 const CIRCUIT_COORDS = {
   Sakhir: { latitude: 26.0325, longitude: 50.5106 },
   Jeddah: { latitude: 21.6319, longitude: 39.1044 },
@@ -191,12 +146,6 @@ function mapUnsplashPhoto(photo) {
   }
 }
 
-// Vertaalt drivernummer naar vlag-asset.
-function driverFlag(driverNumber) {
-  const code = DRIVER_NATIONALITIES[driverNumber]
-  return code ? `https://flagcdn.com/w40/${code}.png` : ''
-}
-
 // Fetch helper met timeout + retry/backoff voor externe APIs.
 async function requestJsonWithRetry(url, retries = 2, timeoutMs = 8000) {
   let lastError = null
@@ -282,11 +231,13 @@ async function fetchOpenF1Snapshot() {
       `${OPENF1_BASE}/championship_drivers?session_key=${sessionKey}`
     )
     drivers = (Array.isArray(driversData) ? driversData : [])
-      .map((d) => ({
-        name: `${d.first_name ?? ''} ${d.last_name ?? ''}`.trim() || d.broadcast_name || 'Onbekend',
-        number: d.driver_number ?? '-',
-        flag: driverFlag(d.driver_number),
-      }))
+      .map((d) =>
+        enrichDriverNationality({
+          name: `${d.first_name ?? ''} ${d.last_name ?? ''}`.trim() || d.broadcast_name || 'Onbekend',
+          number: d.driver_number ?? '-',
+          name_acronym: d.name_acronym || null,
+        })
+      )
       .sort((a, b) => Number(a.number) - Number(b.number))
 
     const driverByNumber = new Map((Array.isArray(driversData) ? driversData : []).map((d) => [d.driver_number, d]))
@@ -296,7 +247,7 @@ async function fetchOpenF1Snapshot() {
       const fullName = driver
         ? `${driver.first_name ?? ''} ${driver.last_name ?? ''}`.trim() || driver.broadcast_name
         : `#${row.driver_number}`
-      return {
+      return enrichDriverNationality({
         position: row.position_current ?? row.position_start ?? null,
         driver_number: row.driver_number,
         name: fullName,
@@ -304,14 +255,9 @@ async function fetchOpenF1Snapshot() {
         name_acronym: driver?.name_acronym || null,
         team_name: driver?.team_name || null,
         team_colour: driver?.team_colour || null,
-        country_code:
-          driver?.country_code ||
-          DRIVER_COUNTRY_CODES[row.driver_number] ||
-          null,
         headshot_url: driver?.headshot_url || null,
         points: row.points_current ?? row.points_start ?? 0,
-        flag: driverFlag(row.driver_number),
-      }
+      })
     }
 
     const standingsRows = (Array.isArray(standingsData) ? standingsData : []).filter(
@@ -326,19 +272,19 @@ async function fetchOpenF1Snapshot() {
       seenNumbers.add(d.driver_number)
       const fullName =
         `${d.first_name ?? ''} ${d.last_name ?? ''}`.trim() || d.broadcast_name || 'Onbekend'
-      seasonStats.push({
-        position: null,
-        driver_number: d.driver_number,
-        name: fullName,
-        full_name: fullName,
-        name_acronym: d.name_acronym || null,
-        team_name: d.team_name || null,
-        team_colour: d.team_colour || null,
-        country_code: d.country_code || DRIVER_COUNTRY_CODES[d.driver_number] || null,
-        headshot_url: d.headshot_url || null,
-        points: 0,
-        flag: driverFlag(d.driver_number),
-      })
+      seasonStats.push(
+        enrichDriverNationality({
+          position: null,
+          driver_number: d.driver_number,
+          name: fullName,
+          full_name: fullName,
+          name_acronym: d.name_acronym || null,
+          team_name: d.team_name || null,
+          team_colour: d.team_colour || null,
+          headshot_url: d.headshot_url || null,
+          points: 0,
+        })
+      )
     }
 
     seasonStats.sort((a, b) => {
@@ -355,6 +301,7 @@ async function fetchOpenF1Snapshot() {
     ? {
         ...upcomingRace,
         countryName: upcomingRace.country_name || 'Land onbekend',
+        countryCode: upcomingRace.country_code || null,
         countryFlag: upcomingRace.country_flag || '',
         circuitName: upcomingRace.circuit_short_name || upcomingRace.location || 'Circuit onbekend',
         circuitImage: upcomingRace.circuit_image || null,
@@ -404,6 +351,7 @@ function mapRaceSession(session, meetingNameByKey, now) {
     meetingName: meetingTitle || session.session_name || 'Race onbekend',
     circuitName: session.circuit_short_name || session.location || 'Circuit onbekend',
     countryName: session.country_name || 'Land onbekend',
+    countryCode: session.country_code || null,
     countryFlag: session.country_flag || '',
     dateStart: meetingMeta?.dateStart || session.date_start || null,
     dateEnd: meetingMeta?.dateEnd || session.date_end || session.date_start || null,

@@ -1,12 +1,17 @@
 // Centrale dashboard-hook: cache-first render + server fetch + cache overschrijven.
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { LOADER_MIN_VISIBLE_MS } from '../constants/uiTiming'
+import { enrichDriverNationality } from '../data/driverNationalities'
 import { CACHE_KEY, readCache, readUnsplashCache, writeCache } from '../services/cacheService'
 import {
   buildFallbackPhotos,
   fetchDashboardBackgroundPhotos,
   getHourlyUnsplashCacheKey,
 } from '../services/unsplashService'
+
+function enrichDriverList(list) {
+  return Array.isArray(list) ? list.map(enrichDriverNationality) : []
+}
 
 const WEATHER_POLL_MS = 30000
 const INITIAL_LOADING_MAX_WAIT_MS = 2200
@@ -41,13 +46,15 @@ export function useDashboardData() {
     buildWidgetState(cached?.weather, null, cached?.weatherUpdatedAt)
   )
   const [drivers, setDrivers] = useState(() =>
-    buildWidgetState(cached?.drivers, [], cached?.driversUpdatedAt)
+    buildWidgetState(enrichDriverList(cached?.drivers), [], cached?.driversUpdatedAt)
   )
   const [seasonStats, setSeasonStats] = useState(() =>
     buildWidgetState(
-      cached?.seasonStatsYear === currentSeasonYear || canUseLegacySeasonStatsCache
-        ? cached?.seasonStats
-        : [],
+      enrichDriverList(
+        cached?.seasonStatsYear === currentSeasonYear || canUseLegacySeasonStatsCache
+          ? cached?.seasonStats
+          : []
+      ),
       [],
       cached?.seasonStatsYear === currentSeasonYear || canUseLegacySeasonStatsCache
         ? cached?.seasonStatsUpdatedAt
@@ -141,14 +148,15 @@ export function useDashboardData() {
         }
 
         if (Array.isArray(data?.drivers) && data.drivers.length > 0) {
+          const enrichedDrivers = enrichDriverList(data.drivers)
           setDrivers({
             loading: false,
             error: '',
-            data: data.drivers,
+            data: enrichedDrivers,
             stale: Boolean(data.stale),
             lastUpdated: data?.timestamps?.driversUpdatedAt || nowTs,
           })
-          cacheUpdate.drivers = data.drivers
+          cacheUpdate.drivers = enrichedDrivers
           cacheUpdate.driversUpdatedAt = data?.timestamps?.driversUpdatedAt || nowTs
         } else {
           setDrivers((prev) =>
@@ -159,14 +167,15 @@ export function useDashboardData() {
         }
 
         if (Array.isArray(data?.seasonStats) && data.seasonStats.length > 0) {
+          const enrichedStats = enrichDriverList(data.seasonStats)
           setSeasonStats({
             loading: false,
             error: '',
-            data: data.seasonStats,
+            data: enrichedStats,
             stale: Boolean(data.stale),
             lastUpdated: data?.timestamps?.seasonStatsUpdatedAt || nowTs,
           })
-          cacheUpdate.seasonStats = data.seasonStats
+          cacheUpdate.seasonStats = enrichedStats
           cacheUpdate.seasonStatsUpdatedAt = data?.timestamps?.seasonStatsUpdatedAt || nowTs
           cacheUpdate.seasonStatsYear = data?.seasonStatsYear || new Date().getFullYear()
         } else {
