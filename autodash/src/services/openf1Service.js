@@ -1,37 +1,6 @@
 // OpenF1 mappers/fetchers voor volgende race, drivers en season standings.
+import { driverFlagUrl, resolveDriverCountryCode } from '../data/driverNationalities'
 import { requestJsonWithRetry } from './httpClient'
-
-// OpenF1 levert country_code=null voor alle rijders; bevestigd via session 11253 (Suzuka 2026).
-const DRIVER_NATIONALITIES = {
-  1: 'nl',
-  3: 'nl',
-  4: 'gb',
-  5: 'br',
-  6: 'fr',
-  10: 'fr',
-  11: 'mx',
-  12: 'it',
-  14: 'es',
-  16: 'mc',
-  18: 'ca',
-  23: 'th',
-  27: 'de',
-  30: 'nz',
-  31: 'fr',
-  41: 'gb',
-  43: 'ar',
-  44: 'gb',
-  55: 'es',
-  63: 'gb',
-  77: 'fi',
-  81: 'au',
-  87: 'gb',
-}
-
-export function driverFlag(driverNumber) {
-  const code = DRIVER_NATIONALITIES[driverNumber]
-  return code ? `https://flagcdn.com/w40/${code}.png` : ''
-}
 
 // Haalt context op (meetings/sessions) en bepaalt volgende race + laatste racesessie.
 export async function fetchOpenF1RaceContext({ openF1Client, year, now, signal }) {
@@ -110,6 +79,7 @@ export function mapUpcomingRace(upcomingRace) {
   return {
     ...upcomingRace,
     countryName: upcomingRace.country_name || 'Land onbekend',
+    countryCode: upcomingRace.country_code || null,
     countryFlag: upcomingRace.country_flag || '',
     circuitName: upcomingRace.circuit_short_name || upcomingRace.location || 'Circuit onbekend',
     circuitImage: upcomingRace.circuit_image || null,
@@ -170,7 +140,9 @@ export function mapDrivers(driversData) {
     .map((d) => ({
       name: `${d.first_name ?? ''} ${d.last_name ?? ''}`.trim() || d.broadcast_name || 'Onbekend',
       number: d.driver_number ?? '-',
-      flag: driverFlag(d.driver_number),
+      flag: driverFlagUrl(d),
+      name_acronym: d.name_acronym || null,
+      country_code: resolveDriverCountryCode(d),
     }))
     .sort((a, b) => Number(a.number) - Number(b.number))
 }
@@ -190,7 +162,9 @@ export function mapStandings(standingsData, driversData) {
         ? `${driver.first_name ?? ''} ${driver.last_name ?? ''}`.trim() || driver.broadcast_name
         : `#${row.driver_number}`,
       points: row.points_current ?? row.points_start ?? 0,
-      flag: driverFlag(row.driver_number),
+      flag: driverFlagUrl(driver || row),
+      name_acronym: driver?.name_acronym || null,
+      country_code: resolveDriverCountryCode(driver || row),
     }
   })
   for (const d of driversData) {
@@ -202,7 +176,9 @@ export function mapStandings(standingsData, driversData) {
       name:
         `${d.first_name ?? ''} ${d.last_name ?? ''}`.trim() || d.broadcast_name || 'Onbekend',
       points: 0,
-      flag: driverFlag(d.driver_number),
+      flag: driverFlagUrl(d),
+      name_acronym: d.name_acronym || null,
+      country_code: resolveDriverCountryCode(d),
     })
   }
   rows.sort((a, b) => {

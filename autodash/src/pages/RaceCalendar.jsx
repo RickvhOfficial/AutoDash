@@ -1,5 +1,6 @@
 // Route: /races — toont F1-kalender, next-race highlight en desktop/mobile weergave.
 import { useCallback, useEffect, useRef, useState } from 'react'
+import CountryInfoCard from '../components/CountryInfoCard'
 import ErrorMessage from '../components/ErrorMessage'
 import LoadingSpinner from '../components/LoadingSpinner'
 import PageMainContent from '../components/PageMainContent'
@@ -11,7 +12,7 @@ import {
   SNAPSHOT_STARTUP_RETRY_BASE_MS,
 } from '../constants/uiTiming'
 import { CACHE_KEY_RACE_CALENDAR, readCache, writeCache } from '../services/cacheService'
-import { getCountryFlag } from '../services/countriesService'
+import { getCountryFlag, getCountryInfo } from '../services/countriesService'
 import { getRaceCalendar } from '../services/f1Service'
 
 // Zelfde hero-hoogte als Home voor consistente top-layout tussen routes.
@@ -71,6 +72,46 @@ function getDisplayStatus(session, nextRaceKey) {
   return session.status || 'Aankomend'
 }
 
+const DESKTOP_ROW_GRID = 'grid-cols-[1.35fr_2.4fr_1.35fr_1fr_2rem]'
+
+function ChevronIcon({ open }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 20 20"
+      fill="currentColor"
+      className={`h-5 w-5 text-red-500 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+      aria-hidden
+    >
+      <path
+        fillRule="evenodd"
+        d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.25a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z"
+        clipRule="evenodd"
+      />
+    </svg>
+  )
+}
+
+function handleRaceToggleKeyDown(e, onToggle) {
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault()
+    onToggle()
+  }
+}
+
+function RaceCountryPanel({ loading, error, country }) {
+  if (loading) {
+    return <LoadingSpinner message="Landinfo laden..." compact />
+  }
+  if (error) {
+    return <p className="text-sm text-red-300">{error}</p>
+  }
+  if (country) {
+    return <CountryInfoCard country={country} />
+  }
+  return <p className="text-sm text-slate-500">Geen landinfo beschikbaar.</p>
+}
+
 export default function RaceCalendar() {
   const cachedRef = useRef(readCache(CACHE_KEY_RACE_CALENDAR))
   const cached = cachedRef.current
@@ -81,6 +122,73 @@ export default function RaceCalendar() {
   const [loading, setLoading] = useState(initialRaces.length === 0)
   const [error, setError] = useState('')
   const [stale, setStale] = useState(false)
+  const [expandedRaceKey, setExpandedRaceKey] = useState(null)
+  const [countryInfo, setCountryInfo] = useState(null)
+  const [countryLoading, setCountryLoading] = useState(false)
+  const [countryError, setCountryError] = useState('')
+  const countryCacheRef = useRef({})
+  const countryFetchRef = useRef(null)
+
+  const toggleRace = useCallback((session) => {
+    const key = getRaceKey(session)
+    setExpandedRaceKey((prev) => (prev === key ? null : key))
+  }, [])
+
+  useEffect(() => {
+    if (!expandedRaceKey) {
+      setCountryInfo(null)
+      setCountryLoading(false)
+      setCountryError('')
+      return undefined
+    }
+
+    const session = races.find((race) => getRaceKey(race) === expandedRaceKey)
+    const countryName = session?.countryName?.trim()
+    if (!countryName) {
+      setCountryInfo(null)
+      setCountryLoading(false)
+      setCountryError('Geen landnaam voor deze race.')
+      return undefined
+    }
+
+    const cacheKey = (session.countryCode?.trim() || countryName).toLowerCase()
+    if (countryCacheRef.current[cacheKey]) {
+      setCountryInfo(countryCacheRef.current[cacheKey])
+      setCountryLoading(false)
+      setCountryError('')
+      return undefined
+    }
+
+    const controller = new AbortController()
+    countryFetchRef.current?.abort()
+    countryFetchRef.current = controller
+
+    async function fetchCountry() {
+      setCountryLoading(true)
+      setCountryError('')
+      setCountryInfo(null)
+      try {
+        const data = await getCountryInfo(countryName, controller.signal, session.countryCode)
+        if (controller.signal.aborted) return
+        if (!data) {
+          setCountryError('Landinfo niet beschikbaar.')
+          return
+        }
+        countryCacheRef.current[cacheKey] = data
+        setCountryInfo(data)
+      } catch (err) {
+        if (err?.name === 'AbortError') return
+        setCountryError('Landinfo kon niet worden geladen.')
+      } finally {
+        if (!controller.signal.aborted) {
+          setCountryLoading(false)
+        }
+      }
+    }
+
+    fetchCountry()
+    return () => controller.abort()
+  }, [expandedRaceKey, races])
 
   // Laadt kalenderdata en vult missende vlaggen waar nodig aan.
   const loadRaceCalendar = useCallback(async (signal) => {
@@ -116,10 +224,10 @@ export default function RaceCalendar() {
           }
           const enriched = await Promise.all(
             racesIn.map(async (race) => {
-              if (race.countryFlag) return race
-              const flag = await getCountryFlag(race.countryName, signal)
+              const flag = await getCountryFlag(race.countryName, signal, race.countryCode)
               return {
                 ...race,
+                countryCode: race.countryCode ?? null,
                 countryFlag: flag || '',
               }
             })
@@ -284,89 +392,129 @@ export default function RaceCalendar() {
             )}
             {/* Desktoptabel met los zwevende rijen voor hover/scale effecten. */}
             <div className="hidden overflow-visible rounded-xl border border-slate-700 lg:block">
-              <div className="grid grid-cols-[1.35fr_2.4fr_1.35fr_1fr] gap-7 border-b border-slate-700 bg-slate-900/90 px-7 py-5 text-sm font-semibold uppercase tracking-wide text-slate-200">
+              <div
+                className={`grid ${DESKTOP_ROW_GRID} gap-7 border-b border-slate-700 bg-slate-900/90 px-7 py-5 text-sm font-semibold uppercase tracking-wide text-slate-200`}
+              >
                 <span>Datum</span>
                 <span>Circuit</span>
                 <span>Land</span>
                 <span className="text-center">Status</span>
+                <span className="sr-only">Landinfo</span>
               </div>
               <div className="space-y-3 bg-slate-950/60 px-2 py-3">
-                {races.map((session, idx) => (
-                  <div
-                    key={getRaceKey(session)}
-                    className={`relative z-0 grid min-h-[6.5rem] grid-cols-[1.35fr_2.4fr_1.35fr_1fr] items-center gap-7 rounded-xl border px-7 py-6 text-base text-slate-100 transition-transform duration-200 ease-out ${
-                      getRaceKey(session) === nextRaceKey
-                        ? 'border-[#ff1e00] bg-[#23151a] shadow-[0_0_20px_rgba(255,30,0,0.2)]'
-                        : session.status === 'Voorbij'
-                          ? 'border-slate-800 bg-gray-900/20 text-slate-500 shadow-[inset_0_0_0_9999px_rgba(148,163,184,0.08)]'
-                        : idx % 2 === 0
-                          ? 'border-slate-800 bg-slate-900/70 hover:bg-slate-800/100'
-                          : 'border-slate-800 bg-slate-900/45 hover:bg-slate-800/100'
-                    }`}
-                  >
-                    <span className="text-[0.95rem] font-medium text-slate-200">
-                      {formatDateRange(session.dateStart, session.dateEnd)}
-                    </span>
-                    <span className="min-w-0">
-                      <span
-                        className={`block truncate text-xl font-extrabold ${
-                          session.status === 'Voorbij' ? 'text-slate-400' : 'text-white'
+                {races.map((session, idx) => {
+                  const raceKey = getRaceKey(session)
+                  const open = expandedRaceKey === raceKey
+                  const isNext = raceKey === nextRaceKey
+                  const displayStatus = getDisplayStatus(session, nextRaceKey)
+                  const rowBorderClass = isNext
+                    ? 'border-[#ff1e00] shadow-[0_0_20px_rgba(255,30,0,0.2)]'
+                    : session.status === 'Voorbij'
+                      ? 'border-slate-800'
+                      : 'border-slate-800'
+                  const rowBgClass = isNext
+                    ? 'bg-[#23151a]'
+                    : session.status === 'Voorbij'
+                      ? 'bg-gray-900/20 text-slate-500 shadow-[inset_0_0_0_9999px_rgba(148,163,184,0.08)]'
+                      : idx % 2 === 0
+                        ? 'bg-slate-900/70'
+                        : 'bg-slate-900/45'
+
+                  return (
+                    <div
+                      key={raceKey}
+                      className={`relative z-0 overflow-hidden rounded-xl border text-base text-slate-100 transition-colors duration-200 ${rowBorderClass} ${rowBgClass} ${
+                        open ? 'border-slate-600' : ''
+                      }`}
+                    >
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        aria-expanded={open}
+                        onClick={() => toggleRace(session)}
+                        onKeyDown={(e) => handleRaceToggleKeyDown(e, () => toggleRace(session))}
+                        className={`grid min-h-[6.5rem] cursor-pointer ${DESKTOP_ROW_GRID} items-center gap-7 px-7 py-6 transition-colors ${
+                          open ? 'bg-slate-800/40' : 'hover:bg-slate-800/95'
                         }`}
                       >
-                        {session.meetingName}
-                      </span>
-                      <span
-                        className={`mt-1.5 block truncate text-base ${
-                          session.status === 'Voorbij' ? 'text-slate-600' : 'text-slate-300'
-                        }`}
-                      >
-                        {session.circuitName}
-                      </span>
-                    </span>
-                    <span className="flex items-center gap-3">
-                      {session.countryFlag ? (
-                        <img
-                          src={session.countryFlag}
-                          alt={session.countryName}
-                          className="h-6 w-8 rounded-sm object-cover"
-                          loading="lazy"
-                        />
-                      ) : (
-                        <span className="h-6 w-8 rounded-sm bg-slate-600/70" />
-                      )}
-                      <span className="truncate text-[0.95rem]">{session.countryName}</span>
-                    </span>
-                    <span className="text-center">
-                      {(() => {
-                        const displayStatus = getDisplayStatus(session, nextRaceKey)
-                        return (
-                      <span
-                        className={getStatusClass(
-                          displayStatus,
-                          getRaceKey(session) === nextRaceKey
-                        )}
-                      >
-                        {displayStatus}
-                      </span>
-                        )
-                      })()}
-                    </span>
-                  </div>
-                ))}
+                        <span className="text-[0.95rem] font-medium text-slate-200">
+                          {formatDateRange(session.dateStart, session.dateEnd)}
+                        </span>
+                        <span className="min-w-0">
+                          <span
+                            className={`block truncate text-xl font-extrabold ${
+                              session.status === 'Voorbij' ? 'text-slate-400' : 'text-white'
+                            }`}
+                          >
+                            {session.meetingName}
+                          </span>
+                          <span
+                            className={`mt-1.5 block truncate text-base ${
+                              session.status === 'Voorbij' ? 'text-slate-600' : 'text-slate-300'
+                            }`}
+                          >
+                            {session.circuitName}
+                          </span>
+                        </span>
+                        <span className="flex items-center gap-3">
+                          {session.countryFlag ? (
+                            <img
+                              src={session.countryFlag}
+                              alt={session.countryName}
+                              className="h-6 w-8 rounded-sm object-cover"
+                              loading="lazy"
+                            />
+                          ) : (
+                            <span className="h-6 w-8 rounded-sm bg-slate-600/70" />
+                          )}
+                          <span className="truncate text-[0.95rem]">{session.countryName}</span>
+                        </span>
+                        <span className="text-center">
+                          <span className={getStatusClass(displayStatus, isNext)}>
+                            {displayStatus}
+                          </span>
+                        </span>
+                        <span className="flex justify-end text-red-500">
+                          <ChevronIcon open={open} />
+                        </span>
+                      </div>
+
+                      {open ? (
+                        <div className="border-t border-slate-800/90 px-7 py-5">
+                          <p className="mb-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            Landinfo
+                          </p>
+                          <RaceCountryPanel
+                            loading={countryLoading}
+                            error={countryError}
+                            country={countryInfo}
+                          />
+                        </div>
+                      ) : null}
+                    </div>
+                  )
+                })}
               </div>
             </div>
 
             {/* Mobiele weergave met dezelfde racevolgorde in cards. */}
             <div className="grid gap-4 lg:hidden sm:grid-cols-2">
-              {races.map((session) => (
-                <RaceCard
-                  key={getRaceKey(session)}
-                  session={{ ...session, status: getDisplayStatus(session, nextRaceKey) }}
-                  isNextRace={
-                    getRaceKey(session) === nextRaceKey
-                  }
-                />
-              ))}
+              {races.map((session) => {
+                const raceKey = getRaceKey(session)
+                const open = expandedRaceKey === raceKey
+                return (
+                  <RaceCard
+                    key={raceKey}
+                    session={{ ...session, status: getDisplayStatus(session, nextRaceKey) }}
+                    isNextRace={raceKey === nextRaceKey}
+                    expanded={open}
+                    onToggle={() => toggleRace(session)}
+                    countryInfo={open ? countryInfo : null}
+                    countryLoading={open && countryLoading}
+                    countryError={open ? countryError : ''}
+                  />
+                )
+              })}
             </div>
           </div>
             )}

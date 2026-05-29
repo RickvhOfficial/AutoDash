@@ -5,40 +5,13 @@ import DriverHeadshot from '../components/DriverHeadshot'
 import ErrorMessage from '../components/ErrorMessage'
 import LoadingSpinner from '../components/LoadingSpinner'
 import PageMainContent from '../components/PageMainContent'
+import { driverFlagUrl, resolveDriverCountryLabel } from '../data/driverNationalities'
 import { useF1Drivers } from '../hooks/useF1Drivers'
 import { HOME_HERO_HEIGHT_PX } from './Home'
 
 const STANDEN_HERO_HEIGHT_PX = HOME_HERO_HEIGHT_PX
 const HERO_IMG = '/standen.jpg'
 const HERO_FALLBACK = '/RaceKalender.jpg'
-
-const COUNTRY_BY_FLAG_CODE = {
-  nl: 'Nederland',
-  gb: 'Verenigd Koninkrijk',
-  mc: 'Monaco',
-  fr: 'Frankrijk',
-  it: 'Italië',
-  es: 'Spanje',
-  mx: 'Mexico',
-  ca: 'Canada',
-  th: 'Thailand',
-  de: 'Duitsland',
-  nz: 'Nieuw-Zeeland',
-  ar: 'Argentinië',
-  fi: 'Finland',
-  au: 'Australië',
-  br: 'Brazilië',
-}
-
-function getLandLabel(driver) {
-  if (driver?.country_code) return driver.country_code
-  const flagUrl = String(driver?.flag || '').toLowerCase()
-  const match = flagUrl.match(/\/w\d+\/([a-z]{2})\.png$/)
-  if (match?.[1] && COUNTRY_BY_FLAG_CODE[match[1]]) {
-    return COUNTRY_BY_FLAG_CODE[match[1]]
-  }
-  return 'Onbekend'
-}
 
 export default function DriverStandings() {
   const { drivers, seasonYear, loading, error } = useF1Drivers()
@@ -146,6 +119,7 @@ export default function DriverStandings() {
                   const teamAccent = driver?.team_colour ? `#${driver.team_colour}` : '#ff1e00'
                   const rowKey = driver.driver_number ?? `${driver.full_name ?? driver.name}-${idx}`
                   const position = driver.position ?? idx + 1
+                  const flagSrc = driverFlagUrl(driver)
                   return (
                     <div
                       key={rowKey}
@@ -175,13 +149,13 @@ export default function DriverStandings() {
                         {Number(driver.points ?? 0)} pt
                       </span>
                       <span className="truncate text-slate-300">
-                        {getLandLabel(driver)}
+                        {resolveDriverCountryLabel(driver)}
                       </span>
                       <span className="flex justify-center">
-                        {driver.flag ? (
+                        {flagSrc ? (
                           <img
-                            src={driver.flag}
-                            alt={driver.country_code || ''}
+                            src={flagSrc}
+                            alt={resolveDriverCountryLabel(driver)}
                             className="h-5 w-7 rounded-sm border border-slate-700 object-cover"
                             loading="lazy"
                           />

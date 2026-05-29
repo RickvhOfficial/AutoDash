@@ -6,14 +6,19 @@ import {
   SNAPSHOT_STARTUP_MAX_ATTEMPTS,
   SNAPSHOT_STARTUP_RETRY_BASE_MS,
 } from '../constants/uiTiming'
+import { enrichDriverNationality } from '../data/driverNationalities'
 import { CACHE_KEY_DRIVER_STANDINGS, readCache, writeCache } from '../services/cacheService'
+
+function enrichDriverList(list) {
+  return Array.isArray(list) ? list.map(enrichDriverNationality) : []
+}
 
 const PAGE_DATA_POLL_MS = 30000
 
 export function useF1Drivers() {
   const cachedRef = useRef(readCache(CACHE_KEY_DRIVER_STANDINGS))
   const cached = cachedRef.current
-  const initialDrivers = Array.isArray(cached?.seasonStats) ? cached.seasonStats : []
+  const initialDrivers = enrichDriverList(cached?.seasonStats)
 
   const [drivers, setDrivers] = useState(initialDrivers)
   const [seasonYear, setSeasonYear] = useState(cached?.seasonStatsYear ?? null)
@@ -55,7 +60,7 @@ export function useF1Drivers() {
             const res = await fetch('/api/dashboard-snapshot', { signal })
             if (!res.ok) throw new Error('Coureurs konden niet worden geladen.')
             const data = await res.json()
-            list = Array.isArray(data?.seasonStats) ? data.seasonStats : []
+            list = enrichDriverList(data?.seasonStats)
             year = data?.seasonStatsYear ?? null
             lastError = null
             if (list.length > 0) break
