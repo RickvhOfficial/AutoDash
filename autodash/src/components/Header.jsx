@@ -31,18 +31,27 @@ const navLinks = [
 // Vaste nav-rij (desktop sidebar + overlay): 54×54 px cel (hoogte = breedte).
 const NAV_ROW_H_PX = 54
 
-/** Animated hamburger ↔ kruis; `open=true` betekent "menu staat open" (icoon wordt X). */
+const SIDEBAR_ICON_BOX =
+  'flex size-9 shrink-0 items-center justify-center rounded-md bg-slate-700 text-slate-200'
+
+const SIDEBAR_EASE = 'ease-[cubic-bezier(0.4,0,0.2,1)]'
+
+/** Animated hamburger ↔ kruis; zelfde visuele maat als Font Awesome h-4 w-4 in size-9 box. */
 export function MenuToggleIcon({ open }) {
   return (
-    <span className="relative block h-5 w-6">
+    <span className="relative block h-4 w-4">
       <span
-        className={`absolute left-0 top-0 block h-0.5 w-6 bg-slate-200 transition-transform duration-300 ${open ? 'translate-y-2 rotate-45' : ''}`}
+        className={`absolute left-1/2 top-0 block h-0.5 w-4 bg-slate-200 transition-transform duration-500 ${SIDEBAR_EASE} ${
+          open ? '-translate-x-1/2 translate-y-1.5 rotate-45' : '-translate-x-1/2'
+        }`}
       />
       <span
-        className={`absolute left-0 top-2 block h-0.5 w-6 bg-slate-200 transition-opacity duration-200 ${open ? 'opacity-0' : 'opacity-100'}`}
+        className={`absolute left-1/2 top-1.5 block h-0.5 w-4 -translate-x-1/2 bg-slate-200 transition-opacity duration-500 ${SIDEBAR_EASE} ${open ? 'opacity-0' : 'opacity-100'}`}
       />
       <span
-        className={`absolute left-0 top-4 block h-0.5 w-6 bg-slate-200 transition-transform duration-300 ${open ? '-translate-y-2 -rotate-45' : ''}`}
+        className={`absolute left-1/2 top-3 block h-0.5 w-4 bg-slate-200 transition-transform duration-500 ${SIDEBAR_EASE} ${
+          open ? '-translate-x-1/2 -translate-y-1.5 -rotate-45' : '-translate-x-1/2'
+        }`}
       />
     </span>
   )
@@ -100,7 +109,7 @@ export default function Header({
                     className={`grid w-full grid-cols-[2.25rem_minmax(0,1fr)] items-center gap-3 rounded-lg border px-3 text-left transition-[colors,box-shadow] duration-200 ease-out ${activeLinkClasses(isActive, 'overlay')}`}
                     style={{ minHeight: NAV_ROW_H_PX, height: NAV_ROW_H_PX }}
                   >
-                    <span className="flex size-9 shrink-0 items-center justify-center justify-self-start rounded-md bg-slate-700 text-xs text-slate-200">
+                    <span className={`${SIDEBAR_ICON_BOX} text-xs`}>
                       <FontAwesomeIcon icon={link.icon ?? faGaugeHigh} className="h-4 w-4" />
                     </span>
                     <span className="min-w-0 text-xs font-medium sm:text-sm">
@@ -119,23 +128,21 @@ export default function Header({
   // h-[54px] bewust gelijk aan NAV_ROW_H_PX (Tailwind JIT vangt geen template-class).
   const sidebarRowClass = 'h-[54px]'
 
-  // Labels blijven zichtbaar tot width-transitie klaar is; daarna sr-only smalle staaf
-  const showNavLabels = menuOpen || !desktopSidebarCollapseSettled
+  const isExpandedLayout = menuOpen || !desktopSidebarCollapseSettled
+  const collapsedSettled = !menuOpen && desktopSidebarCollapseSettled
 
   return (
     <header className="flex w-full flex-col bg-slate-900 text-slate-100">
       <div className="flex min-w-0 flex-col overflow-hidden px-2 py-2.5">
         <div
-          className={`flex ${sidebarRowClass} shrink-0 items-center border-b border-slate-800/90 ${
-            menuOpen
-              ? 'justify-end px-0'
-              : 'justify-end px-2 pr-3'
+          className={`flex ${sidebarRowClass} shrink-0 items-center border-b border-slate-800/90 px-2 ${
+            isExpandedLayout ? 'justify-end' : 'justify-center'
           }`}
         >
           <button
             type="button"
             onClick={() => setMenuOpen((prev) => !prev)}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-transparent text-slate-200 transition hover:bg-slate-800"
+            className={`${SIDEBAR_ICON_BOX} outline-none transition-colors duration-300 ${SIDEBAR_EASE} hover:bg-slate-600 focus-visible:ring-1 focus-visible:ring-red-500/45`}
             aria-label={menuOpen ? 'Menu sluiten' : 'Menu openen'}
             aria-expanded={menuOpen}
           >
@@ -147,33 +154,28 @@ export default function Header({
           <ul className="space-y-2">
             {navLinks.map((link) => {
               const isActive = location.pathname === link.path
-              const narrowRowLayout =
-                !menuOpen && desktopSidebarCollapseSettled
-                  ? 'justify-center px-2'
-                  : 'justify-start gap-2 px-2'
               return (
                 <li key={link.path}>
                   <Link
                     to={link.path}
-                    title={
-                      !menuOpen && desktopSidebarCollapseSettled
-                        ? link.label
-                        : undefined
-                    }
-                    className={`group flex ${sidebarRowClass} w-full min-w-0 items-center overflow-hidden rounded-lg border transition-[colors,box-shadow] duration-200 ease-out ${narrowRowLayout} ${activeLinkClasses(isActive, 'sidebar')}`}
+                    title={collapsedSettled ? link.label : undefined}
+                    className={`group flex ${sidebarRowClass} w-full min-w-0 items-center overflow-hidden rounded-lg border px-2 transition-[colors,box-shadow,gap] duration-500 ${SIDEBAR_EASE} ${
+                      isExpandedLayout ? 'justify-start gap-2' : 'justify-center gap-0'
+                    } ${activeLinkClasses(isActive, 'sidebar')}`}
                   >
-                    <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-slate-700 text-sm text-slate-200">
+                    <span className={`${SIDEBAR_ICON_BOX} text-sm`}>
                       <FontAwesomeIcon
                         icon={link.icon ?? faGaugeHigh}
                         className="h-4 w-4"
                       />
                     </span>
                     <span
-                      className={
-                        showNavLabels
-                          ? 'min-w-0 flex-1 overflow-hidden text-ellipsis text-left text-sm font-medium whitespace-nowrap'
-                          : 'sr-only'
-                      }
+                      aria-hidden={!menuOpen}
+                      className={`min-w-0 flex-none overflow-hidden text-left text-sm font-medium whitespace-nowrap transition-[opacity,max-width] duration-500 ${SIDEBAR_EASE} ${
+                        menuOpen
+                          ? 'max-w-[11rem] opacity-100'
+                          : 'max-w-0 opacity-0'
+                      }`}
                     >
                       {link.label}
                     </span>

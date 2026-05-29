@@ -84,8 +84,9 @@ function AppLayout() {
   const isRaceCalendar = location.pathname === '/races'
   const isDriverStandings = location.pathname === '/standings'
   const isCircuitWeather = location.pathname === '/weather'
+  const isVehicleSearch = location.pathname === '/vehicles'
   const usesTopHeroLayout =
-    isHome || isRaceCalendar || isDriverStandings || isCircuitWeather
+    isHome || isRaceCalendar || isDriverStandings || isCircuitWeather || isVehicleSearch
 
   const footerRef = useRef(null)
 
@@ -140,7 +141,7 @@ function AppLayout() {
     sidebarAnimFallbackRef.current = setTimeout(() => {
       setSidebarWidthAnimDone(true)
       sidebarAnimFallbackRef.current = null
-    }, 600)
+    }, 520)
     return () => {
       if (sidebarAnimFallbackRef.current) {
         clearTimeout(sidebarAnimFallbackRef.current)
@@ -171,7 +172,7 @@ function AppLayout() {
           top: 'var(--sidebar-mid-y, calc(6rem + (100dvh - 6rem) / 2))',
         }}
         onTransitionEnd={handleDesktopAsideTransitionEnd}
-        className={`fixed left-0 z-50 hidden max-h-[min(calc(100dvh-7rem),52rem)] -translate-y-1/2 flex-col overflow-hidden rounded-r-2xl border border-slate-800 bg-slate-900 shadow-xl transition-[width] duration-500 ease-in-out lg:flex ${
+        className={`fixed left-0 z-50 hidden max-h-[min(calc(100dvh-7rem),52rem)] -translate-y-1/2 flex-col overflow-hidden rounded-r-2xl border border-slate-800 bg-slate-900 shadow-xl transition-[width] duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] will-change-[width] lg:flex ${
           menuOpen ? 'w-64' : 'w-[4.5rem]'
         }`}
       >
@@ -212,7 +213,7 @@ function AppLayout() {
       {/* lg: inspring = smalle sidebar (4.5rem) + kleine lucht; aside left-0 */}
       <main
         className={`flex min-h-0 flex-1 flex-col pl-0 ${
-          isRaceCalendar || isDriverStandings || isCircuitWeather ? 'lg:pl-0' : 'lg:pl-[5rem]'
+          isRaceCalendar || isDriverStandings || isCircuitWeather || isVehicleSearch ? 'lg:pl-0' : 'lg:pl-[5rem]'
         } ${
           usesTopHeroLayout ? 'pt-0' : 'pt-24'
         }`}

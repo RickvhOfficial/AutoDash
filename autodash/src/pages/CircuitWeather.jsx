@@ -13,6 +13,7 @@ import {
 } from 'recharts'
 import ErrorMessage from '../components/ErrorMessage'
 import LoadingSpinner from '../components/LoadingSpinner'
+import PageMainContent from '../components/PageMainContent'
 import WeatherCard from '../components/WeatherCard'
 import { circuits, normalizeCircuitKey, resolveCircuitCoords } from '../data/circuits'
 import { HOME_HERO_HEIGHT_PX } from './Home'
@@ -23,7 +24,12 @@ import {
   weatherCodeToLabelNl,
 } from '../services/weatherService'
 import { getRaceCalendar } from '../services/f1Service'
-import { CACHE_KEY_CIRCUIT_WEATHER, readCache, writeCache } from '../services/cacheService'
+import {
+  CACHE_KEY_CIRCUIT_WEATHER,
+  CACHE_KEY_RACE_CALENDAR,
+  readCache,
+  writeCache,
+} from '../services/cacheService'
 
 const WEATHER_HERO_HEIGHT_PX = HOME_HERO_HEIGHT_PX
 /** Zelfde orde van grootte als server `CIRCUIT_WEATHER_TTL_MS`: geen nutteloze refetch bij terugkeren naar de pagina. */
@@ -37,6 +43,40 @@ function formatDayLabel(isoDate, index) {
   const d = new Date(`${isoDate}T12:00:00`)
   if (Number.isNaN(d.getTime())) return isoDate
   return d.toLocaleDateString('nl-NL', { weekday: 'short' })
+}
+
+function parseDateOnly(isoDateString) {
+  if (!isoDateString || typeof isoDateString !== 'string') return null
+  const datePart = isoDateString.split('T')[0]
+  if (!datePart) return null
+  return new Date(`${datePart}T00:00:00Z`)
+}
+
+function getRaceStartTime(session) {
+  const start = parseDateOnly(session?.dateStart)
+  if (!start || Number.isNaN(start.getTime())) return Number.POSITIVE_INFINITY
+  return start.getTime()
+}
+
+/** Zelfde logica als RaceCalendar: eerstvolgende race uit kalender. */
+function pickNextRaceCircuitId(races) {
+  if (!Array.isArray(races) || races.length === 0) return ''
+
+  const now = new Date()
+  const todayStart = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
+  ).getTime()
+
+  const upcoming = races
+    .filter((race) => getRaceStartTime(race) >= todayStart)
+    .sort((a, b) => getRaceStartTime(a) - getRaceStartTime(b))
+
+  for (const race of upcoming) {
+    const name = race?.circuitName || race?.meetingName || ''
+    if (!resolveCircuitCoords(name, race?.meetingName)) continue
+    return normalizeCircuitKey(name)
+  }
+  return ''
 }
 
 function formatClockFromIso(iso, utcOffsetSeconds = 0) {
@@ -154,8 +194,13 @@ function MetricBlock({
 }
 
 export default function CircuitWeather() {
+  const cachedCalendar = readCache(CACHE_KEY_RACE_CALENDAR)
+  const initialNextCircuitId = pickNextRaceCircuitId(
+    Array.isArray(cachedCalendar?.races) ? cachedCalendar.races : []
+  )
+
   const [circuitOptions, setCircuitOptions] = useState([])
-  const [selectedCircuit, setSelectedCircuit] = useState('')
+  const [selectedCircuit, setSelectedCircuit] = useState(initialNextCircuitId)
   const [isCircuitMenuOpen, setIsCircuitMenuOpen] = useState(false)
   const [weather, setWeather] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -200,13 +245,14 @@ export default function CircuitWeather() {
         const options = [...unique.values()]
         if (!options.length) throw new Error('Geen circuits gevonden via racekalender.')
 
-        const now = new Date()
-        const upcoming = options
-          .filter((c) => c.dateStart && new Date(c.dateStart) >= now)
-          .sort((a, b) => new Date(a.dateStart) - new Date(b.dateStart))[0]
+        const nextRaceId = pickNextRaceCircuitId(races)
+        const defaultId =
+          nextRaceId && options.some((c) => c.id === nextRaceId)
+            ? nextRaceId
+            : options[0].id
 
         setCircuitOptions(options)
-        setSelectedCircuit(upcoming?.id || options[0].id)
+        setSelectedCircuit(defaultId)
       } catch {
         const fallback = circuits.map((c) => ({
           id: normalizeCircuitKey(c.place || c.name),
@@ -418,8 +464,7 @@ export default function CircuitWeather() {
         </p>
       </div>
 
-      <section className="relative z-0 flex min-h-0 flex-1 flex-col px-4 py-8 sm:px-6 sm:py-10 md:px-8 md:py-12 lg:pl-[5rem] lg:pr-[3.5rem] lg:py-14">
-        <div className="mx-auto w-full max-w-[92rem]">
+      <PageMainContent maxWidth="max-w-[92rem]">
           {loading && (
             <div className="py-8">
               <LoadingSpinner message="Weer laden..." />
@@ -543,8 +588,7 @@ export default function CircuitWeather() {
               </div>
             </div>
           )}
-        </div>
-      </section>
+      </PageMainContent>
     </section>
   )
 }
