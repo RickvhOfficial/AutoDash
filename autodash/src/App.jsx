@@ -85,8 +85,14 @@ function AppLayout() {
   const isDriverStandings = location.pathname === '/standings'
   const isCircuitWeather = location.pathname === '/weather'
   const isVehicleSearch = location.pathname === '/vehicles'
+  const isLapTracker = location.pathname === '/lap-tracker'
   const usesTopHeroLayout =
-    isHome || isRaceCalendar || isDriverStandings || isCircuitWeather || isVehicleSearch
+    isHome ||
+    isRaceCalendar ||
+    isDriverStandings ||
+    isCircuitWeather ||
+    isVehicleSearch ||
+    isLapTracker
 
   const footerRef = useRef(null)
 
@@ -213,7 +219,13 @@ function AppLayout() {
       {/* lg: inspring = smalle sidebar (4.5rem) + kleine lucht; aside left-0 */}
       <main
         className={`flex min-h-0 flex-1 flex-col pl-0 ${
-          isRaceCalendar || isDriverStandings || isCircuitWeather || isVehicleSearch ? 'lg:pl-0' : 'lg:pl-[5rem]'
+          isRaceCalendar ||
+          isDriverStandings ||
+          isCircuitWeather ||
+          isVehicleSearch ||
+          isLapTracker
+            ? 'lg:pl-0'
+            : 'lg:pl-[5rem]'
         } ${
           usesTopHeroLayout ? 'pt-0' : 'pt-24'
         }`}
