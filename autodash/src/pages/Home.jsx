@@ -1,9 +1,11 @@
 // Route: / — dashboard-overzicht met widgets voor volgende race, weer, standen en laptracker.
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import LoadingSpinner from '../components/LoadingSpinner'
 import PageMainContent from '../components/PageMainContent'
 import { useDashboardData } from '../hooks/useDashboardData'
+import { useLapTimes } from '../hooks/useLapTimes'
+import { getHomeLapSummary } from '../utils/lapStorage'
 
 const HERO_IMG =
   'https://images.unsplash.com/photo-1728116693268-125c5d6ad9e2?auto=format&fit=crop&w=1920&q=80'
@@ -57,47 +59,17 @@ export default function Home() {
     refreshing,
   } = useDashboardData()
 
-  // Lees lokaal opgeslagen lapdata zodat "Mijn rondetijden" direct gevuld kan worden.
-  const [myLaps] = useState(() => {
-    const raw = localStorage.getItem('lapTimes')
-    if (!raw) return []
-    try {
-      const parsed = JSON.parse(raw)
-      return Array.isArray(parsed) ? parsed : []
-    } catch {
-      return []
-    }
-  })
+  const { data: lapData } = useLapTimes()
 
-  // Normaliseer lapdata en bereken totalen/beste/laatste ronde.
-  const lapSummary = useMemo(() => {
-    if (!myLaps.length) return null
-    const normalized = myLaps
-      .map((lap) => {
-        if (typeof lap === 'number') return { circuit: 'Onbekend circuit', lapTime: lap }
-        if (lap && typeof lap === 'object') {
-          const lapTime = Number(lap.lapTime ?? lap.time ?? lap.timeMs ?? lap.duration)
-          return {
-            circuit: lap.circuit || lap.track || 'Onbekend circuit',
-            lapTime: Number.isFinite(lapTime) ? lapTime : null,
-          }
-        }
-        return { circuit: 'Onbekend circuit', lapTime: null }
-      })
-      .filter((lap) => lap.lapTime !== null)
-    if (!normalized.length) return null
-    const bestLap = normalized.reduce((best, lap) => (lap.lapTime < best.lapTime ? lap : best))
-    const latestLap = normalized[normalized.length - 1]
-    return { total: normalized.length, best: bestLap, latest: latestLap }
-  }, [myLaps])
+  const lapSummary = useMemo(() => getHomeLapSummary(lapData), [lapData])
 
   // Gedeelde card-styling voor alle dashboardtegels.
   const cardClass =
     'group relative overflow-hidden rounded-lg border border-slate-700/80 bg-slate-900/55 p-5 text-left shadow-lg shadow-black/25 transition-[transform,box-shadow,background-color,border-color] duration-300 ease-out hover:scale-[1.015] hover:border-slate-500/80 hover:bg-slate-900/70 hover:shadow-xl hover:shadow-black/45'
 
   // Rendert achtergrondfoto + overlay per kaarttegel.
-  function renderCardBackground(idx, overrideImage) {
-    const imageUrl = overrideImage || bgPhotos[idx]?.url || fallbackPhotos[idx]?.url
+  function renderCardBackground(idx) {
+    const imageUrl = bgPhotos[idx]?.url || fallbackPhotos[idx]?.url
     return (
       <>
         <img
@@ -106,6 +78,24 @@ export default function Home() {
           className="absolute inset-0 h-full w-full object-cover "
         />
         <div className="absolute inset-0 bg-gradient-to-b from-slate-950/75 via-slate-950/60 to-slate-950/80" />
+      </>
+    )
+  }
+
+  // Volgende race: baanschets rechts. carbon.png is donker op donker → invert maakt wegdek zichtbaar wit.
+  function renderNextRaceBackground(circuitImage) {
+    if (!circuitImage) {
+      return <div className="absolute inset-0 bg-slate-950" />
+    }
+    const isCarbon = /carbon/i.test(circuitImage)
+    const trackClass = isCarbon
+      ? 'pointer-events-none absolute inset-y-0 right-0 w-[58%] object-contain object-right p-3 invert brightness-125 opacity-95'
+      : 'pointer-events-none absolute inset-y-0 right-0 w-[58%] object-contain object-right p-3 brightness-200 contrast-125 opacity-95'
+    return (
+      <>
+        <div className="absolute inset-0 bg-slate-950" />
+        <img src={circuitImage} alt="" aria-hidden="true" className={trackClass} />
+        <div className="absolute inset-y-0 left-0 w-[46%] bg-gradient-to-r from-slate-950 to-transparent" />
       </>
     )
   }
@@ -128,8 +118,8 @@ export default function Home() {
             <div className="grid items-stretch gap-6 lg:grid-cols-[2fr_1fr]">
               <div className="grid gap-6 sm:grid-cols-2">
                 <Link to="/races" className={`${cardClass} min-h-44 cursor-pointer`}>
-                  {renderCardBackground(0, nextRace.data?.circuitImage)}
-                  <div className="relative z-10">
+                  {renderNextRaceBackground(nextRace.data?.circuitImage)}
+                  <div className="relative z-10 max-w-[55%] [text-shadow:0_1px_10px_rgba(2,6,23,0.95)]">
                     <span className="mb-3 block h-0.5 w-14 rounded-full bg-red-500/70" />
                     <h2 className="border-l-2 border-red-500/70 pl-2 text-sm font-semibold">
                       Volgende race
@@ -309,35 +299,64 @@ export default function Home() {
 
               <Link
                 to="/lap-tracker"
-                className={`${cardClass} min-h-[356px] cursor-pointer border-red-500/45 bg-slate-900/75 shadow-[0_0_0_1px_rgba(239,68,68,0.22),0_12px_30px_rgba(2,6,23,0.55)] hover:border-red-400/65 hover:shadow-[0_0_0_1px_rgba(239,68,68,0.35),0_18px_38px_rgba(2,6,23,0.68)] lg:h-full`}
+                className={`${cardClass} min-h-[356px] cursor-pointer border-red-500/40 lg:h-full`}
               >
                 {renderCardBackground(4)}
                 <div className="relative z-10 flex h-full min-h-[356px] flex-col">
                   <span className="mb-3 block h-0.5 w-20 rounded-full bg-red-500/75" />
-                  <h2 className="border-l-2 border-red-500/75 pl-2 text-base font-semibold text-white">
+                  <h2 className="border-l-2 border-red-500/75 pl-2 text-base font-semibold text-white [text-shadow:0_2px_10px_rgba(0,0,0,0.95)]">
                     Mijn rondetijden
                   </h2>
                   {!lapSummary && (
-                    <div className="flex flex-1 items-center justify-center">
-                      <div className="rounded-lg border border-red-600/95 bg-red-950/50 p-5 text-center ring-1 ring-red-500/45 shadow-[0_0_18px_rgba(220,38,38,0.35)]">
-                        <p className="text-base font-semibold text-red-100">
-                          Nog geen tijden opgeslagen.
-                        </p>
-                        <p className="mt-2 text-sm leading-relaxed text-red-100/90">
-                          Voeg je eerste rondes toe in de LapTracker om hier je prestaties te zien.
-                        </p>
-                      </div>
-                    </div>
+                    <p className="mt-4 text-sm leading-relaxed text-slate-200 [text-shadow:0_2px_8px_rgba(0,0,0,0.92)]">
+                      Nog geen tijden opgeslagen. Voeg je eerste rondes toe in de karttijden-tracker
+                      om hier je prestaties te zien.
+                    </p>
                   )}
                   {lapSummary && (
-                    <div className="scrollbar-red mt-4 max-h-[250px] space-y-2 overflow-y-auto pl-2 text-sm text-slate-100">
-                      <p>Totaal opgeslagen rondes: {lapSummary.total}</p>
-                      <p className="text-slate-300">
-                        Beste tijd: {lapSummary.best.lapTime?.toFixed(3)}s ({lapSummary.best.circuit})
-                      </p>
-                      <p className="text-slate-300">
-                        Laatste tijd: {lapSummary.latest.lapTime?.toFixed(3)}s (
-                        {lapSummary.latest.circuit})
+                    <div className="mt-4 flex min-h-0 flex-1 flex-col gap-5">
+                      <div className="min-h-0 flex-1">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-300 [text-shadow:0_1px_6px_rgba(0,0,0,0.9)]">
+                          Top 5 snelste rondes
+                        </p>
+                        <ol className="scrollbar-red mt-2 max-h-[11.5rem] space-y-2 overflow-y-auto text-sm">
+                          {lapSummary.topFive.map((lap, idx) => (
+                            <li
+                              key={`${lap.trackName}-${lap.time}-${idx}`}
+                              className="flex items-baseline justify-between gap-3 border-b border-slate-600/35 pb-2 last:border-0 last:pb-0"
+                            >
+                              <span
+                                className="min-w-0 flex-1 truncate text-slate-100 [text-shadow:0_2px_8px_rgba(0,0,0,0.9)]"
+                                title={lap.trackName}
+                              >
+                                <span className="mr-2 tabular-nums text-slate-400">{idx + 1}.</span>
+                                {lap.trackName}
+                              </span>
+                              <span className="shrink-0 font-mono font-bold text-red-300 [text-shadow:0_2px_8px_rgba(0,0,0,0.9)]">
+                                {lap.time}
+                              </span>
+                            </li>
+                          ))}
+                        </ol>
+                      </div>
+
+                      <div className="border-t border-slate-500/50 pt-4">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-300 [text-shadow:0_1px_6px_rgba(0,0,0,0.9)]">
+                          Laatst gereden
+                        </p>
+                        <p className="mt-2 font-mono text-xl font-bold text-white [text-shadow:0_2px_10px_rgba(0,0,0,0.95)]">
+                          {lapSummary.latest.time}
+                        </p>
+                        <p
+                          className="mt-1 truncate text-sm text-slate-200 [text-shadow:0_2px_8px_rgba(0,0,0,0.9)]"
+                          title={lapSummary.latest.trackName}
+                        >
+                          {lapSummary.latest.trackName}
+                        </p>
+                      </div>
+
+                      <p className="text-xs text-slate-400 [text-shadow:0_1px_6px_rgba(0,0,0,0.88)]">
+                        {lapSummary.total} rondes · {lapSummary.trackCount} banen
                       </p>
                     </div>
                   )}
