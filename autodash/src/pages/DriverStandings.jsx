@@ -8,6 +8,7 @@ import PageMainContent from '../components/PageMainContent'
 import { driverFlagUrl, resolveDriverCountryLabel } from '../data/driverNationalities'
 import { useF1Drivers } from '../hooks/useF1Drivers'
 import { HOME_HERO_HEIGHT_PX } from './Home'
+import { heroOverlay, pageShell, borderSubtle, borderDefault, inputField, tableWrap, tableHeader, tableBody, tableRow, panel, panelMuted, textFaint, cardText, cardTextMuted, textOnPhoto } from '../utils/themeClasses'
 
 const STANDEN_HERO_HEIGHT_PX = HOME_HERO_HEIGHT_PX
 const HERO_IMG = '/standen.jpg'
@@ -32,9 +33,9 @@ export default function DriverStandings() {
   const visible = filtered
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col bg-slate-950 text-slate-100">
+    <section className={`flex min-h-0 flex-1 flex-col ${pageShell}`}>
       <div
-        className="relative w-full shrink-0 border-b border-slate-800"
+        className={`relative w-full shrink-0 border-b ${borderSubtle}`}
         style={{ height: STANDEN_HERO_HEIGHT_PX, maxHeight: STANDEN_HERO_HEIGHT_PX }}
       >
         <img
@@ -47,10 +48,10 @@ export default function DriverStandings() {
             }
           }}
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-slate-950/70 via-slate-950/30 to-slate-950/80" />
+        <div className={`absolute inset-0 ${heroOverlay}`} />
         <div className="absolute inset-x-0 bottom-0 z-10">
           <div className="w-full px-6 py-7 md:px-10">
-            <h1 className="pl-12 text-3xl font-extrabold tracking-tight text-white [text-shadow:0_5px_18px_rgba(0,0,0,0.95)] md:text-4xl">
+            <h1 className={`pl-12 text-3xl font-extrabold tracking-tight md:text-4xl ${textOnPhoto}`}>
               F1 Coureurs Standen {displayYear}
             </h1>
           </div>
@@ -69,11 +70,11 @@ export default function DriverStandings() {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Zoek op naam of team..."
-                  className="w-full rounded-lg border border-slate-700 bg-slate-900/80 px-4 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500/60"
+                  className={`w-full rounded-lg px-4 py-2.5 text-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500/60 ${inputField}`}
                 />
               </label>
               {!error && drivers.length > 0 && (
-                <p className="text-sm text-slate-400">
+                <p className={`text-sm ${textFaint}`}>
                   {visible.length} van {drivers.length} coureurs
                 </p>
               )}
@@ -89,7 +90,7 @@ export default function DriverStandings() {
             )}
 
             {!error && drivers.length === 0 && (
-              <div className="rounded-lg border border-slate-700 bg-slate-900/50 p-6 text-center text-slate-300">
+              <div className={`${panel} text-center`}>
                 <p className="text-base leading-relaxed">
                   Er is nog geen actuele kampioenschapsstand beschikbaar.
                 </p>
@@ -97,7 +98,7 @@ export default function DriverStandings() {
             )}
 
             {!error && drivers.length > 0 && visible.length === 0 && (
-              <p className="rounded-lg border border-slate-800 bg-slate-900/60 p-6 text-center text-slate-300">
+              <p className={panelMuted}>
                 Geen coureurs gevonden voor je zoekopdracht.
               </p>
             )}
@@ -105,8 +106,8 @@ export default function DriverStandings() {
             {!error && visible.length > 0 && (
           <div className="space-y-4">
             {/* Desktop tabel volgens wireframe: Positie | Naam | Team | Punten | Land | Vlag */}
-            <div className="hidden overflow-visible rounded-xl border border-slate-700 lg:block">
-              <div className="grid grid-cols-[0.6fr_2.2fr_1.6fr_0.9fr_1fr_0.7fr] gap-5 border-b border-slate-700 bg-slate-900/90 px-6 py-4 text-xs font-semibold uppercase tracking-wide text-slate-200">
+            <div className={`hidden ${tableWrap} lg:block`}>
+              <div className={`grid grid-cols-[0.6fr_2.2fr_1.6fr_0.9fr_1fr_0.7fr] gap-5 px-6 py-4 ${tableHeader}`}>
                 <span>Positie</span>
                 <span>Naam</span>
                 <span>Team</span>
@@ -114,7 +115,7 @@ export default function DriverStandings() {
                 <span>Land</span>
                 <span className="text-center">Vlag</span>
               </div>
-              <div className="space-y-3 bg-slate-950/60 px-2 py-3">
+              <div className={tableBody}>
                 {visible.map((driver, idx) => {
                   const teamAccent = driver?.team_colour ? `#${driver.team_colour}` : '#ff1e00'
                   const rowKey = driver.driver_number ?? `${driver.full_name ?? driver.name}-${idx}`
@@ -123,7 +124,7 @@ export default function DriverStandings() {
                   return (
                     <div
                       key={rowKey}
-                      className="grid min-h-[5.5rem] grid-cols-[0.6fr_2.2fr_1.6fr_0.9fr_1fr_0.7fr] items-center gap-5 rounded-xl border border-slate-800 bg-slate-900/65 px-6 py-3 text-sm text-slate-100 transition-colors duration-200 ease-out hover:bg-slate-800/95"
+                      className={`grid min-h-[5.5rem] grid-cols-[0.6fr_2.2fr_1.6fr_0.9fr_1fr_0.7fr] items-center gap-5 px-6 py-3 ${tableRow}`}
                       style={{ borderLeft: `4px solid ${teamAccent}` }}
                     >
                       <span className="text-2xl font-extrabold text-red-500">{position}</span>
@@ -134,21 +135,21 @@ export default function DriverStandings() {
                           size="sm"
                         />
                         <div className="min-w-0">
-                          <p className="truncate font-bold text-white">
+                          <p className={`truncate font-bold ${cardText}`}>
                             {driver.full_name || driver.name || 'Onbekende coureur'}
                           </p>
-                          <p className="text-xs uppercase tracking-wide text-slate-400">
+                          <p className={`text-xs uppercase tracking-wide ${textFaint}`}>
                             {driver.name_acronym || '---'}
                           </p>
                         </div>
                       </div>
-                      <span className="truncate text-slate-300">
+                      <span className={`truncate ${cardTextMuted}`}>
                         {driver.team_name || 'Team onbekend'}
                       </span>
                       <span className="font-bold text-red-400">
                         {Number(driver.points ?? 0)} pt
                       </span>
-                      <span className="truncate text-slate-300">
+                      <span className={`truncate ${cardTextMuted}`}>
                         {resolveDriverCountryLabel(driver)}
                       </span>
                       <span className="flex justify-center">
@@ -156,11 +157,11 @@ export default function DriverStandings() {
                           <img
                             src={flagSrc}
                             alt={resolveDriverCountryLabel(driver)}
-                            className="h-5 w-7 rounded-sm border border-slate-700 object-cover"
+                            className={`h-5 w-7 rounded-sm border object-cover ${borderDefault}`}
                             loading="lazy"
                           />
                         ) : (
-                          <span className="h-5 w-7 rounded-sm border border-slate-700 bg-slate-800" />
+                          <span className={`h-5 w-7 rounded-sm border bg-slate-200 dark:bg-slate-800 ${borderDefault}`} />
                         )}
                       </span>
                     </div>

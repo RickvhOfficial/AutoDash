@@ -30,6 +30,30 @@ import {
 
 import { HOME_HERO_HEIGHT_PX } from './Home'
 
+import {
+  heroOverlay,
+  inputField,
+  pageShell,
+  textOnPhoto,
+  borderSubtle,
+  tableHeader,
+  tableBody,
+  tableRow,
+  panel,
+  dataTableShell,
+  emptyStateBox,
+  toolbarStrip,
+  tooltipBox,
+  secondaryButton,
+  textFaint,
+  cardText,
+  cardTextMuted,
+  cardTextSoft,
+  fillRowOpen,
+  fillCard,
+  borderDefault,
+} from '../utils/themeClasses'
+
 
 
 const HERO_HEIGHT_PX = HOME_HERO_HEIGHT_PX
@@ -49,8 +73,7 @@ const PAGE_SIZE = 30
 
 
 const inputClassName =
-
-  'w-full rounded-lg border border-slate-600 bg-slate-900/90 px-4 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500/60'
+  `w-full rounded-lg px-4 py-2.5 text-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500/60 ${inputField}`
 
 
 
@@ -170,7 +193,7 @@ function TrimCell({ value, rowId, isOpen, onOpen, interactive = true }) {
 
   if (!text) {
 
-    return <span className="min-w-0 truncate text-left text-slate-300">—</span>
+    return <span className={`min-w-0 truncate text-left ${textFaint}`}>—</span>
 
   }
 
@@ -178,7 +201,7 @@ function TrimCell({ value, rowId, isOpen, onOpen, interactive = true }) {
 
     return (
 
-      <span className="block min-w-0 text-left text-sm leading-relaxed text-slate-300">
+      <span className={`block min-w-0 text-left text-sm leading-relaxed ${cardTextMuted}`}>
 
         {text}
 
@@ -214,11 +237,11 @@ function TrimCell({ value, rowId, isOpen, onOpen, interactive = true }) {
 
         onPointerDown={stopRowToggle}
 
-        className={`block w-full min-w-0 text-left text-slate-300 ${
+        className={`block w-full min-w-0 text-left ${cardTextMuted} ${
 
           showFull
 
-            ? `cursor-pointer hover:text-slate-100 focus:outline-none focus-visible:text-red-400 ${isOpen ? 'text-red-400' : ''}`
+            ? `cursor-pointer hover:text-slate-900 focus:outline-none focus-visible:text-red-400 dark:hover:text-slate-100 ${isOpen ? 'text-red-400' : ''}`
 
             : 'cursor-default'
 
@@ -348,7 +371,7 @@ function TrimPopup({ openTrim, onClose }) {
 
       data-trim-popup
 
-      className="fixed z-[100] max-w-sm cursor-pointer rounded-lg border border-red-500/50 bg-slate-900 px-3 py-2.5 text-left text-xs leading-relaxed text-slate-100 shadow-2xl"
+      className={tooltipBox}
 
       style={{ top: pos.top, left: pos.left }}
 
@@ -427,7 +450,7 @@ function VehicleDetailPanel({ row }) {
 
     return (
 
-      <p className="text-sm text-slate-500">Geen extra specificaties beschikbaar voor dit model.</p>
+      <p className={`text-sm ${textFaint}`}>Geen extra specificaties beschikbaar voor dit model.</p>
 
     )
 
@@ -443,13 +466,13 @@ function VehicleDetailPanel({ row }) {
 
           key={col.key}
 
-          className="grid grid-cols-1 gap-1 border-b border-slate-800/70 py-3 last:border-b-0 sm:grid-cols-[11rem_minmax(0,1fr)] sm:items-baseline sm:gap-x-6"
+          className={`grid grid-cols-1 gap-1 py-3 sm:grid-cols-[11rem_minmax(0,1fr)] sm:items-baseline sm:gap-x-6`}
 
         >
 
-          <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">{col.label}</dt>
+          <dt className={`text-xs font-semibold uppercase tracking-wide ${textFaint}`}>{col.label}</dt>
 
-          <dd className="text-sm leading-relaxed text-slate-200">{displayValue(row[col.key])}</dd>
+          <dd className={`text-sm leading-relaxed ${cardText}`}>{displayValue(row[col.key])}</dd>
 
         </div>
 
@@ -465,13 +488,15 @@ function VehicleDetailPanel({ row }) {
 
 function cellClass(key, { header = false } = {}) {
 
-  if (header) return 'min-w-0 truncate text-left text-xs font-semibold uppercase tracking-wide text-slate-200'
+  const base = 'min-w-0 truncate text-left'
 
-  if (key === 'make') return 'min-w-0 truncate text-left font-medium text-white'
+  if (header) return `${base} text-xs font-semibold uppercase tracking-wide ${cardTextSoft}`
 
-  if (key === 'year') return 'min-w-0 truncate text-left tabular-nums text-slate-300'
+  if (key === 'make') return `${base} font-medium ${cardText}`
 
-  return 'min-w-0 truncate text-left text-slate-300'
+  if (key === 'year') return `${base} tabular-nums ${cardTextMuted}`
+
+  return `${base} ${cardTextMuted}`
 
 }
 
@@ -487,7 +512,7 @@ function VehicleDesktopTable({ rows, expandedRowId, onToggleRow, trimUi }) {
 
       <div
 
-        className={`grid w-full items-center rounded-t-lg border-b border-slate-700 bg-slate-900/90 py-6 ${TABLE_GRID_GAP} ${rowPadding}`}
+        className={`grid w-full items-center rounded-t-lg py-6 ${tableHeader} ${TABLE_GRID_GAP} ${rowPadding}`}
 
         style={TABLE_GRID_STYLE}
 
@@ -519,9 +544,9 @@ function VehicleDesktopTable({ rows, expandedRowId, onToggleRow, trimUi }) {
 
             key={row.id}
 
-            className={`rounded-xl border transition-colors duration-200 ${
+            className={`${tableRow} transition-colors duration-200 ${
 
-              open ? 'border-slate-600 bg-slate-900/80' : 'border-slate-800 bg-slate-900/65'
+              open ? fillRowOpen : ''
 
             }`}
 
@@ -539,11 +564,7 @@ function VehicleDesktopTable({ rows, expandedRowId, onToggleRow, trimUi }) {
 
               aria-expanded={open}
 
-              className={`group grid w-full min-h-[5.25rem] cursor-pointer items-center py-5 text-left text-sm text-slate-100 transition-colors ${TABLE_GRID_GAP} ${rowPadding} ${
-
-                open ? 'bg-slate-800/40' : 'hover:bg-slate-800/95'
-
-              }`}
+              className={`group grid w-full min-h-[5.25rem] cursor-pointer items-center py-5 text-left text-sm transition-colors ${TABLE_GRID_GAP} ${rowPadding}`}
 
               style={TABLE_GRID_STYLE}
 
@@ -571,7 +592,7 @@ function VehicleDesktopTable({ rows, expandedRowId, onToggleRow, trimUi }) {
 
             {open && (
 
-              <div className={`border-t border-slate-800/90 py-1 ${rowPadding}`}>
+              <div className={`border-t py-1 ${borderSubtle} ${rowPadding}`}>
 
                 <VehicleDetailPanel row={row} />
 
@@ -601,9 +622,9 @@ function VehicleMobileRow({ row, expandedRowId, onToggleRow }) {
 
     <article
 
-      className={`rounded-xl border text-sm transition-colors ${
+      className={`text-sm transition-colors ${
 
-        open ? 'border-slate-600 bg-slate-900/80' : 'border-slate-800 bg-slate-900/65'
+        open ? `${tableRow} ${fillRowOpen}` : tableRow
 
       }`}
 
@@ -621,17 +642,13 @@ function VehicleMobileRow({ row, expandedRowId, onToggleRow }) {
 
         aria-expanded={open}
 
-        className={`group flex w-full min-h-[5.25rem] cursor-pointer items-center justify-between gap-3 p-5 text-left ${
-
-          open ? 'bg-slate-800/40' : 'hover:bg-slate-800/95'
-
-        }`}
+        className="group flex w-full min-h-[5.25rem] cursor-pointer items-center justify-between gap-3 p-5 text-left"
 
       >
 
         <div className="min-w-0 flex-1">
 
-          <h3 className="font-bold text-white">
+          <h3 className={`font-bold ${cardText}`}>
 
             {displayValue(row.make)} {displayValue(row.model)}
 
@@ -647,7 +664,7 @@ function VehicleMobileRow({ row, expandedRowId, onToggleRow }) {
 
           )}
 
-          <p className="mt-1 text-slate-400">
+          <p className={`mt-1 ${textFaint}`}>
 
             {displayValue(row.year)}
 
@@ -669,7 +686,7 @@ function VehicleMobileRow({ row, expandedRowId, onToggleRow }) {
 
       {open && (
 
-        <div className="border-t border-slate-800/90 px-5 py-1">
+        <div className={`border-t px-5 py-1 ${borderSubtle}`}>
 
           <VehicleDetailPanel row={row} />
 
@@ -695,11 +712,11 @@ function TablePagination({ page, totalPages, totalResults, onPageChange, positio
 
     <div
 
-      className={`flex flex-wrap items-center justify-between gap-3 ${borderClass} border-slate-800 bg-slate-950/80 px-4 py-3`}
+      className={`flex flex-wrap items-center justify-between gap-3 ${borderClass} ${toolbarStrip} px-4 py-3`}
 
     >
 
-      <p className="text-sm text-slate-400">
+      <p className={`text-sm ${textFaint}`}>
 
         Pagina {page + 1} van {totalPages} ({totalResults} resultaten)
 
@@ -715,7 +732,7 @@ function TablePagination({ page, totalPages, totalResults, onPageChange, positio
 
           onClick={() => onPageChange(page - 1)}
 
-          className="rounded-lg border border-slate-600 px-4 py-1.5 text-sm text-slate-200 transition hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-40"
+          className={`rounded-lg px-4 py-1.5 ${secondaryButton} disabled:cursor-not-allowed disabled:opacity-40`}
 
         >
 
@@ -731,7 +748,7 @@ function TablePagination({ page, totalPages, totalResults, onPageChange, positio
 
           onClick={() => onPageChange(page + 1)}
 
-          className="rounded-lg border border-slate-600 px-4 py-1.5 text-sm text-slate-200 transition hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-40"
+          className={`rounded-lg px-4 py-1.5 ${secondaryButton} disabled:cursor-not-allowed disabled:opacity-40`}
 
         >
 
@@ -1057,11 +1074,11 @@ export default function VehicleSearch() {
 
   return (
 
-    <section className="flex min-h-0 flex-1 flex-col bg-slate-950 text-slate-100">
+    <section className={`flex min-h-0 flex-1 flex-col ${pageShell}`}>
 
       <div
 
-        className="relative w-full shrink-0 border-b border-slate-800"
+        className={`relative w-full shrink-0 border-b ${borderSubtle}`}
 
         style={{ height: HERO_HEIGHT_PX, maxHeight: HERO_HEIGHT_PX }}
 
@@ -1087,7 +1104,7 @@ export default function VehicleSearch() {
 
         />
 
-        <div className="absolute inset-0 bg-gradient-to-b from-slate-950/75 via-slate-950/35 to-slate-950/85" />
+        <div className={`absolute inset-0 ${heroOverlay}`} />
 
 
 
@@ -1097,13 +1114,13 @@ export default function VehicleSearch() {
 
             <div className="pl-10 lg:pl-12">
 
-              <h1 className="text-3xl font-extrabold tracking-tight text-white [text-shadow:0_5px_18px_rgba(0,0,0,0.95)] md:text-4xl">
+              <h1 className={`text-3xl font-extrabold tracking-tight md:text-4xl ${textOnPhoto}`}>
 
                 Voertuig Zoeker
 
               </h1>
 
-              <p className="mt-1 max-w-xl text-sm text-slate-200 [text-shadow:0_3px_10px_rgba(0,0,0,0.92)] md:text-base">
+              <p className={`mt-1 max-w-xl text-sm md:text-base ${textOnPhoto}`}>
 
                 Zoek modellen op merk of decodeer een VIN — volledig gratis via open databronnen.
 
@@ -1263,7 +1280,7 @@ export default function VehicleSearch() {
 
 
 
-        <p className="mb-6 rounded-lg border border-slate-800 bg-slate-900/40 px-4 py-3 text-sm text-slate-400">
+        <p className={`${panel} mb-6 px-4 py-3 text-sm`}>
 
           Zoek op merk, model of beide (bijv. Citroën cactus). Na het zoeken worden specificaties
 
@@ -1293,7 +1310,7 @@ export default function VehicleSearch() {
 
         {!hasSearched && !loading && (
 
-          <div className="mb-6 rounded-xl border border-slate-700 bg-slate-900/50 p-6 text-slate-300">
+          <div className={`${panel} mb-6`}>
 
             <p className="text-base leading-relaxed">
 
@@ -1311,7 +1328,7 @@ export default function VehicleSearch() {
 
         {!loading && enriching && (
 
-          <p className="mb-4 text-sm text-slate-400">
+          <p className={`mb-4 text-sm ${textFaint}`}>
 
             Specificaties (brandstof, uitvoering, transmissie, verbruik, CO₂…) worden aangevuld…
 
@@ -1337,13 +1354,13 @@ export default function VehicleSearch() {
 
         {!loading && !error && hasSearched && showMakeResults && (
 
-          <div className="overflow-x-auto overflow-y-hidden rounded-xl border border-slate-700 bg-slate-950/60">
+          <div className={dataTableShell}>
 
             <div className="w-full min-w-0">
 
               {displayRows.length === 0 ? (
 
-                <div className="bg-slate-950/60 p-8 text-center text-slate-300">
+                <div className={emptyStateBox}>
 
                   {`Geen modellen gevonden voor '${lastSubmittedQuery}'${year ? ` (${year})` : ''}.`}
 
@@ -1381,7 +1398,7 @@ export default function VehicleSearch() {
 
 
 
-                  <div className="grid gap-3 bg-slate-950/60 p-3 lg:hidden">
+                  <div className={`grid gap-3 p-3 lg:hidden ${tableBody}`}>
 
                     {paginatedRows.map((row) => (
 
@@ -1431,7 +1448,7 @@ export default function VehicleSearch() {
 
         {!loading && !error && hasSearched && resultSource === 'vin' && displayRows.length > 0 && (
 
-          <div className="overflow-x-auto overflow-y-hidden rounded-xl border border-slate-700 bg-slate-950/60">
+          <div className={dataTableShell}>
 
             <div className="w-full min-w-0">
 
@@ -1447,7 +1464,7 @@ export default function VehicleSearch() {
 
               />
 
-              <div className="grid gap-3 bg-slate-950/60 p-3 lg:hidden">
+              <div className={`grid gap-3 p-3 lg:hidden ${tableBody}`}>
 
                 {displayRows.map((row) => (
 
@@ -1477,7 +1494,7 @@ export default function VehicleSearch() {
 
         {!loading && !error && hasSearched && displayRows.length > 0 && !queryIsStale && (
 
-          <p className="mt-4 text-sm text-slate-400">
+          <p className={`mt-4 text-sm ${textFaint}`}>
 
             {displayRows.length} resultaat{displayRows.length !== 1 ? 'en' : ''}
 

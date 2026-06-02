@@ -14,6 +14,7 @@ import {
 import { CACHE_KEY_RACE_CALENDAR, readCache, writeCache } from '../services/cacheService'
 import { getCountryFlag, getCountryInfo } from '../services/countriesService'
 import { getRaceCalendar } from '../services/f1Service'
+import { heroOverlay, pageShell, borderSubtle, tableWrap, tableHeaderLg, tableBody, tableRow, raceNextRow, raceNextRowBadge, panel, secondaryButton, textOnPhoto, textFaint, cardText, cardTextMuted, cardTextSoft, fillRowOpen, statusUpcomingBadge } from '../utils/themeClasses'
 
 // Zelfde hero-hoogte als Home voor consistente top-layout tussen routes.
 const RACE_HERO_HEIGHT_PX = HOME_HERO_HEIGHT_PX
@@ -43,15 +44,15 @@ function formatDateRange(dateStart, dateEnd) {
 // Geeft status-badge styling terug; next race krijgt extra nadruk.
 function getStatusClass(status, isNextRace = false) {
   if (isNextRace) {
-    return 'inline-flex min-w-[8rem] items-center justify-center rounded-md border border-[#ff1e00] bg-[#2b1010] px-4 py-2 text-sm font-extrabold text-white ring-1 ring-[#ff1e00]/70 shadow-[0_0_18px_rgba(255,30,0,0.35)]'
+    return raceNextRowBadge
   }
   if (status === 'Voorbij') {
-    return 'inline-flex min-w-[6.5rem] items-center justify-center rounded-md border border-slate-600 bg-slate-800/70 px-3 py-1.5 text-sm font-semibold text-slate-200'
+    return `inline-flex min-w-[6.5rem] items-center justify-center rounded-md border theme-border theme-fill-row-open px-3 py-1.5 text-sm font-semibold ${cardTextMuted}`
   }
   if (status === 'Dit weekend') {
-    return 'inline-flex min-w-[6.5rem] items-center justify-center rounded-md border border-red-500/85 bg-red-950/50 px-3 py-1.5 text-sm font-semibold text-red-100 ring-1 ring-red-500/30'
+    return 'inline-flex min-w-[6.5rem] items-center justify-center rounded-md border border-red-600 bg-red-600 px-3 py-1.5 text-sm font-semibold text-white ring-1 ring-red-500/30 dark:border-red-500/85 dark:bg-red-950/50 dark:text-red-100 dark:ring-red-500/30'
   }
-  return 'inline-flex min-w-[6.5rem] items-center justify-center rounded-md border border-emerald-500/70 bg-emerald-900/25 px-3 py-1.5 text-sm font-semibold text-emerald-200'
+  return `inline-flex min-w-[6.5rem] items-center justify-center rounded-md border px-3 py-1.5 text-sm font-semibold ${statusUpcomingBadge}`
 }
 
 // Hulpfunctie om races chronologisch te vergelijken.
@@ -323,9 +324,9 @@ export default function RaceCalendar() {
   const nextRaceKey = nextRace ? getRaceKey(nextRace) : null
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col bg-slate-950 text-slate-100">
+    <section className={`flex min-h-0 flex-1 flex-col ${pageShell}`}>
       <div
-        className="relative w-full shrink-0 border-b border-slate-800"
+        className={`relative w-full shrink-0 border-b ${borderSubtle}`}
         style={{ height: RACE_HERO_HEIGHT_PX, maxHeight: RACE_HERO_HEIGHT_PX }}
       >
         <img
@@ -333,10 +334,10 @@ export default function RaceCalendar() {
           alt="F1 racekalender hero"
           className="absolute inset-0 h-full w-full object-cover"
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-slate-950/70 via-slate-950/30 to-slate-950/80" />
+        <div className={`absolute inset-0 ${heroOverlay}`} />
         <div className="absolute inset-x-0 bottom-0 z-10">
           <div className="w-full px-6 py-7 md:px-10">
-            <h1 className="pl-12 text-3xl font-extrabold tracking-tight text-white [text-shadow:0_5px_18px_rgba(0,0,0,0.95)] md:text-4xl">
+            <h1 className={`pl-12 text-3xl font-extrabold tracking-tight md:text-4xl ${textOnPhoto}`}>
               F1 Racekalender {seasonYear}
             </h1>
           </div>
@@ -358,14 +359,14 @@ export default function RaceCalendar() {
             {error && <ErrorMessage message={error} onRetry={handleRetry} />}
 
             {!error && races.length === 0 && (
-              <div className="rounded-lg border border-slate-700 bg-slate-900/50 p-6 text-center text-slate-300">
+              <div className={`${panel} text-center`}>
                 <p className="mb-4 text-base leading-relaxed">
                   Er zijn geen races gevonden voor dit seizoen.
                 </p>
                 <button
                   type="button"
                   onClick={handleRetry}
-                  className="rounded-md border border-slate-600 bg-slate-800 px-4 py-2 text-sm font-medium text-slate-100 transition hover:bg-slate-700"
+                  className={secondaryButton}
                 >
                   Opnieuw proberen
                 </button>
@@ -375,25 +376,25 @@ export default function RaceCalendar() {
             {!error && races.length > 0 && (
           <div className="space-y-5">
             {nextRace && (
-              <div className="hidden items-center justify-between rounded-2xl border border-[#ff1e00]/80 bg-[#181922] px-7 py-5 shadow-[0_0_24px_rgba(255,30,0,0.2)] lg:flex">
+              <div className={`hidden items-center justify-between rounded-2xl px-7 py-5 lg:flex ${raceNextRow}`}>
                 <div>
                   <p className="text-sm font-bold uppercase tracking-[0.18em] text-red-500">
                     Volgende race
                   </p>
-                  <p className="mt-1 text-xl font-extrabold text-white">
+                  <p className={`mt-1 text-xl font-extrabold ${cardText}`}>
                     {nextRace.meetingName}
                   </p>
-                  <p className="text-base text-slate-300">{nextRace.circuitName}</p>
+                  <p className={cardTextMuted}>{nextRace.circuitName}</p>
                 </div>
-                <p className="inline-flex items-center justify-center rounded-md border border-[#ff1e00] bg-[#2b1010] px-5 py-3 font-bold text-white ring-1 ring-[#ff1e00]/70 shadow-[0_0_18px_rgba(255,30,0,0.35)]">
+                <p className={raceNextRowBadge}>
                   {formatDateRange(nextRace.dateStart, nextRace.dateEnd)}
                 </p>
               </div>
             )}
             {/* Desktoptabel met los zwevende rijen voor hover/scale effecten. */}
-            <div className="hidden overflow-visible rounded-xl border border-slate-700 lg:block">
+            <div className={`hidden ${tableWrap} lg:block`}>
               <div
-                className={`grid ${DESKTOP_ROW_GRID} gap-7 border-b border-slate-700 bg-slate-900/90 px-7 py-5 text-sm font-semibold uppercase tracking-wide text-slate-200`}
+                className={`grid ${DESKTOP_ROW_GRID} gap-7 px-7 py-5 ${tableHeaderLg}`}
               >
                 <span>Datum</span>
                 <span>Circuit</span>
@@ -401,31 +402,24 @@ export default function RaceCalendar() {
                 <span className="text-center">Status</span>
                 <span className="sr-only">Landinfo</span>
               </div>
-              <div className="space-y-3 bg-slate-950/60 px-2 py-3">
-                {races.map((session, idx) => {
+              <div className={tableBody}>
+                {races.map((session) => {
                   const raceKey = getRaceKey(session)
                   const open = expandedRaceKey === raceKey
                   const isNext = raceKey === nextRaceKey
                   const displayStatus = getDisplayStatus(session, nextRaceKey)
-                  const rowBorderClass = isNext
-                    ? 'border-[#ff1e00] shadow-[0_0_20px_rgba(255,30,0,0.2)]'
-                    : session.status === 'Voorbij'
-                      ? 'border-slate-800'
-                      : 'border-slate-800'
-                  const rowBgClass = isNext
-                    ? 'bg-[#23151a]'
-                    : session.status === 'Voorbij'
-                      ? 'bg-gray-900/20 text-slate-500 shadow-[inset_0_0_0_9999px_rgba(148,163,184,0.08)]'
-                      : idx % 2 === 0
-                        ? 'bg-slate-900/70'
-                        : 'bg-slate-900/45'
+                  const rowClass = isNext
+                    ? raceNextRow
+                    : open
+                      ? `${tableRow} ${fillRowOpen}`
+                      : session.status === 'Voorbij'
+                        ? `${tableRow} theme-fill-row-open`
+                        : tableRow
 
                   return (
                     <div
                       key={raceKey}
-                      className={`relative z-0 overflow-hidden rounded-xl border text-base text-slate-100 transition-colors duration-200 ${rowBorderClass} ${rowBgClass} ${
-                        open ? 'border-slate-600' : ''
-                      }`}
+                      className={`relative z-0 overflow-hidden text-base ${rowClass}`}
                     >
                       <div
                         role="button"
@@ -433,24 +427,22 @@ export default function RaceCalendar() {
                         aria-expanded={open}
                         onClick={() => toggleRace(session)}
                         onKeyDown={(e) => handleRaceToggleKeyDown(e, () => toggleRace(session))}
-                        className={`grid min-h-[6.5rem] cursor-pointer ${DESKTOP_ROW_GRID} items-center gap-7 px-7 py-6 transition-colors ${
-                          open ? 'bg-slate-800/40' : 'hover:bg-slate-800/95'
-                        }`}
+                        className={`grid min-h-[6.5rem] cursor-pointer ${DESKTOP_ROW_GRID} items-center gap-7 px-7 py-6`}
                       >
-                        <span className="text-[0.95rem] font-medium text-slate-200">
+                        <span className={`text-[0.95rem] font-medium ${cardTextSoft}`}>
                           {formatDateRange(session.dateStart, session.dateEnd)}
                         </span>
                         <span className="min-w-0">
                           <span
                             className={`block truncate text-xl font-extrabold ${
-                              session.status === 'Voorbij' ? 'text-slate-400' : 'text-white'
+                              session.status === 'Voorbij' ? textFaint : cardText
                             }`}
                           >
                             {session.meetingName}
                           </span>
                           <span
                             className={`mt-1.5 block truncate text-base ${
-                              session.status === 'Voorbij' ? 'text-slate-600' : 'text-slate-300'
+                              session.status === 'Voorbij' ? textFaint : cardTextMuted
                             }`}
                           >
                             {session.circuitName}
@@ -480,8 +472,8 @@ export default function RaceCalendar() {
                       </div>
 
                       {open ? (
-                        <div className="border-t border-slate-800/90 px-7 py-5">
-                          <p className="mb-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        <div className={`border-t px-7 py-5 ${borderSubtle}`}>
+                          <p className={`mb-4 text-xs font-semibold uppercase tracking-wide ${textFaint}`}>
                             Landinfo
                           </p>
                           <RaceCountryPanel

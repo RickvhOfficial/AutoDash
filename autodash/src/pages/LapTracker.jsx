@@ -6,6 +6,42 @@ import PageMainContent from '../components/PageMainContent'
 import { useLapTimes } from '../hooks/useLapTimes'
 import { HOME_HERO_HEIGHT_PX } from './Home'
 import {
+  borderDefault,
+  borderSubtle,
+  cardText,
+  cardTextMuted,
+  dropdownItem,
+  dropdownMenu,
+  filterChipActive,
+  filterChipIdle,
+  heroOverlay,
+  inputField,
+  lapPrBanner,
+  lapPrDeletePanel,
+  lapBestRowHighlight,
+  lapBestRowHighlightMobile,
+  modalBackdrop,
+  modalBackdropStrong,
+  modalPanel,
+  pageShell,
+  panel,
+  panelMuted,
+  secondaryButton,
+  statCard,
+  surface,
+  fillCard,
+  fillCardMobile,
+  fillRowOpen,
+  tableBody,
+  tableHeader,
+  tableWrap,
+  textFaint,
+  textMuted,
+  textOnPhoto,
+  toolbarStrip,
+  tooltipBox,
+} from '../utils/themeClasses'
+import {
   computeLapStatsForFilter,
   enrichLaps,
   getBestTimeMs,
@@ -30,13 +66,13 @@ const HERO_FALLBACK = '/RaceKalender.jpg'
 const ALL_TRACKS = ''
 
 const inputClass =
-  'w-full rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500/60'
+  `w-full rounded-lg px-3 py-2.5 text-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500/60 ${inputField}`
 
 function isNoteInteractionTarget(target) {
   return Boolean(target?.closest?.('[data-note-trigger], [data-note-popup]'))
 }
 
-function LapNoteCell({ value, rowId, isOpen, onOpen, textClassName = 'text-slate-400' }) {
+function LapNoteCell({ value, rowId, isOpen, onOpen, textClassName = textFaint }) {
   const textRef = useRef(null)
   const [isOverflowing, setIsOverflowing] = useState(false)
   const text = value?.trim() ?? ''
@@ -77,7 +113,7 @@ function LapNoteCell({ value, rowId, isOpen, onOpen, textClassName = 'text-slate
         onPointerDown={stopPropagation}
         className={`block w-full min-w-0 text-left ${textClassName} ${
           showFull
-            ? `cursor-pointer hover:text-slate-100 focus:outline-none focus-visible:text-red-400 ${isOpen ? 'text-red-400' : ''}`
+            ? `cursor-pointer hover:text-slate-900 focus:outline-none focus-visible:text-red-400 dark:hover:text-slate-100 ${isOpen ? 'text-red-400' : ''}`
             : 'cursor-default'
         }`}
       >
@@ -154,7 +190,7 @@ function LapNotePopup({ openNote, onClose }) {
     <div
       role="tooltip"
       data-note-popup
-      className="fixed z-[100] max-w-sm cursor-pointer rounded-lg border border-red-500/50 bg-slate-900 px-3 py-2.5 text-left text-xs leading-relaxed text-slate-100 shadow-2xl"
+      className={`${tooltipBox} cursor-pointer`}
       style={{ top: pos.top, left: pos.left }}
       onClick={onClose}
     >
@@ -171,9 +207,9 @@ function LapTablePagination({ page, totalPages, totalResults, onPageChange, posi
 
   return (
     <div
-      className={`flex flex-wrap items-center justify-between gap-3 ${borderClass} border-slate-800 bg-slate-950/80 px-4 py-3`}
+      className={`flex flex-wrap items-center justify-between gap-3 ${borderClass} ${borderSubtle} ${toolbarStrip} px-4 py-3`}
     >
-      <p className="text-sm text-slate-400">
+      <p className={`text-sm ${textFaint}`}>
         Pagina {page + 1} van {totalPages} ({totalResults} rondes)
       </p>
       <div className="flex gap-2">
@@ -181,7 +217,7 @@ function LapTablePagination({ page, totalPages, totalResults, onPageChange, posi
           type="button"
           disabled={page === 0}
           onClick={() => onPageChange(page - 1)}
-          className="rounded-lg border border-slate-600 px-4 py-1.5 text-sm text-slate-200 transition hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-40"
+          className={`${secondaryButton} disabled:cursor-not-allowed disabled:opacity-40`}
         >
           Vorige
         </button>
@@ -189,7 +225,7 @@ function LapTablePagination({ page, totalPages, totalResults, onPageChange, posi
           type="button"
           disabled={page >= totalPages - 1}
           onClick={() => onPageChange(page + 1)}
-          className="rounded-lg border border-slate-600 px-4 py-1.5 text-sm text-slate-200 transition hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-40"
+          className={`${secondaryButton} disabled:cursor-not-allowed disabled:opacity-40`}
         >
           Volgende
         </button>
@@ -399,9 +435,9 @@ export default function LapTracker() {
   }
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col bg-slate-950 text-slate-100">
+    <section className={`flex min-h-0 flex-1 flex-col ${pageShell}`}>
       <div
-        className="relative w-full shrink-0 border-b border-slate-800"
+        className={`relative w-full shrink-0 border-b ${borderSubtle}`}
         style={{ height: LAP_HERO_HEIGHT_PX, maxHeight: LAP_HERO_HEIGHT_PX }}
       >
         <img
@@ -414,10 +450,10 @@ export default function LapTracker() {
             }
           }}
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-slate-950/70 via-slate-950/30 to-slate-950/80" />
+        <div className={`absolute inset-0 ${heroOverlay}`} />
         <div className="absolute inset-x-0 bottom-0 z-10">
           <div className="w-full px-6 py-7 md:px-10">
-            <h1 className="pl-12 text-3xl font-extrabold tracking-tight text-white [text-shadow:0_5px_18px_rgba(0,0,0,0.95)] md:text-4xl">
+            <h1 className={`pl-12 text-3xl font-extrabold tracking-tight md:text-4xl ${textOnPhoto}`}>
               Mijn Karttijden Tracker
             </h1>
           </div>
@@ -433,11 +469,11 @@ export default function LapTracker() {
 
         <form
           onSubmit={handleSubmit}
-          className="relative mb-6 overflow-visible rounded-xl border border-slate-700 bg-slate-900/50 p-4 md:p-6"
+          className={`relative mb-6 overflow-visible rounded-xl ${panel}`}
         >
           <div className="grid gap-4 lg:grid-cols-[2fr_1fr_1fr_1fr_auto] lg:items-end lg:gap-y-1">
             <div className="relative block min-w-0 lg:col-start-1" ref={trackFieldRef}>
-              <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">
+              <span className={`mb-1 block text-xs font-medium uppercase tracking-wide ${textFaint}`}>
                 Track naam
               </span>
               <input
@@ -462,12 +498,12 @@ export default function LapTracker() {
                 <ul
                   id="track-suggest-listbox"
                   role="listbox"
-                  className="absolute left-0 right-0 top-full z-50 mt-1 max-h-48 overflow-y-auto rounded-lg border border-slate-700 bg-slate-900 py-1 shadow-xl ring-1 ring-black/40"
+                  className={`absolute left-0 right-0 top-full z-50 mt-1 max-h-48 overflow-y-auto ${dropdownMenu}`}
                 >
                   {sortedTracks.length === 0 ? (
-                    <li className="px-3 py-2.5 text-sm text-slate-400">Nog geen locaties.</li>
+                    <li className={`px-3 py-2.5 text-sm ${textFaint}`}>Nog geen locaties.</li>
                   ) : filteredTracks.length === 0 ? (
-                    <li className="px-3 py-2.5 text-sm text-slate-400">
+                    <li className={`px-3 py-2.5 text-sm ${textFaint}`}>
                       Geen banen gevonden voor &quot;{trackName.trim()}&quot;
                     </li>
                   ) : (
@@ -475,7 +511,7 @@ export default function LapTracker() {
                       <li key={t.id} role="option">
                         <button
                           type="button"
-                          className="w-full px-3 py-2.5 text-left text-sm text-slate-100 transition-colors hover:bg-slate-800 focus:bg-red-950/40 focus:outline-none"
+                          className={dropdownItem}
                           onMouseDown={(e) => e.preventDefault()}
                           onClick={() => selectTrackSuggestion(t.name)}
                         >
@@ -489,7 +525,7 @@ export default function LapTracker() {
             </div>
 
             <label className="block min-w-0 lg:col-start-2">
-              <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">
+              <span className={`mb-1 block text-xs font-medium uppercase tracking-wide ${textFaint}`}>
                 Datum
               </span>
               <input
@@ -502,7 +538,7 @@ export default function LapTracker() {
             </label>
 
             <label className="block min-w-0 lg:col-start-3 lg:row-start-1">
-              <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">
+              <span className={`mb-1 block text-xs font-medium uppercase tracking-wide ${textFaint}`}>
                 Tijd
               </span>
               <input
@@ -523,13 +559,13 @@ export default function LapTracker() {
 
             <p
               id="lap-time-hint"
-              className="min-w-0 text-[11px] leading-snug text-slate-400 lg:col-start-3 lg:row-start-2 lg:pt-0.5"
+              className={`min-w-0 text-[11px] leading-snug ${textFaint} lg:col-start-3 lg:row-start-2 lg:pt-0.5`}
             >
               Typ alleen cijfers. Geen tekens.
             </p>
 
             <label className="block min-w-0 lg:col-start-4 lg:row-start-1">
-              <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">
+              <span className={`mb-1 block text-xs font-medium uppercase tracking-wide ${textFaint}`}>
                 Kart type
               </span>
               <select
@@ -554,7 +590,7 @@ export default function LapTracker() {
           </div>
 
           <label className="mt-4 block min-w-0">
-            <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400">
+            <span className={`mb-1 block text-xs font-medium uppercase tracking-wide ${textFaint}`}>
               Notitie (optioneel)
             </span>
             <textarea
@@ -582,7 +618,7 @@ export default function LapTracker() {
 
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <label className="flex min-w-0 flex-col gap-1 sm:max-w-xs">
-            <span className="text-xs font-medium uppercase tracking-wide text-slate-400">
+            <span className={`text-xs font-medium uppercase tracking-wide ${textFaint}`}>
               Selecteer track
             </span>
             <select
@@ -608,9 +644,7 @@ export default function LapTracker() {
               type="button"
               onClick={() => setSortMode('date')}
               className={`rounded-lg border px-3 py-2 text-xs font-semibold uppercase tracking-wide transition-colors ${
-                sortMode === 'date'
-                  ? 'border-red-500 bg-red-500/20 text-red-200'
-                  : 'border-slate-700 bg-slate-900/60 text-slate-400 hover:border-slate-500'
+                sortMode === 'date' ? filterChipActive : filterChipIdle
               }`}
             >
               Datum (nieuwste)
@@ -623,9 +657,7 @@ export default function LapTracker() {
                 closeNotePopup()
               }}
               className={`rounded-lg border px-3 py-2 text-xs font-semibold uppercase tracking-wide transition-colors ${
-                sortMode === 'best'
-                  ? 'border-red-500 bg-red-500/20 text-red-200'
-                  : 'border-slate-700 bg-slate-900/60 text-slate-400 hover:border-slate-500'
+                sortMode === 'best' ? filterChipActive : filterChipIdle
               }`}
             >
               Beste tijd
@@ -633,8 +665,8 @@ export default function LapTracker() {
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-xl border border-slate-700">
-          <div className="hidden border-b border-slate-700 bg-slate-900/90 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-200 md:grid md:grid-cols-[1.4fr_0.9fr_0.8fr_0.8fr_1.2fr_0.5fr] md:gap-3 md:px-6">
+        <div className={`overflow-hidden ${tableWrap}`}>
+          <div className={`hidden py-3 md:grid md:grid-cols-[1.4fr_0.9fr_0.8fr_0.8fr_1.2fr_0.5fr] md:gap-3 md:px-6 ${tableHeader}`}>
             <span>Track</span>
             <span>Datum</span>
             <span>Tijd</span>
@@ -644,7 +676,7 @@ export default function LapTracker() {
           </div>
 
           {displayLaps.length === 0 ? (
-            <p className="bg-slate-950/60 px-6 py-10 text-center text-slate-400">
+            <p className={`px-6 py-10 text-center ${panelMuted}`}>
               Nog geen rondetijden. Voeg je eerste tijd toe met het formulier hierboven.
             </p>
           ) : (
@@ -656,7 +688,7 @@ export default function LapTracker() {
                 onPageChange={goToLapPage}
                 position="top"
               />
-              <div className="space-y-2 bg-slate-950/60 p-2 md:space-y-0 md:divide-y md:divide-slate-800 md:p-0">
+              <div className={`space-y-2 p-2 md:space-y-0 md:divide-y md:p-0 ${tableBody} md:divide-slate-200 dark:md:divide-slate-800`}>
               {paginatedLaps.map((lap) => {
                 const showAsBest = allTracksView
                   ? globalBestMs !== null && lap.timeMs === globalBestMs
@@ -666,24 +698,21 @@ export default function LapTracker() {
                 const rowHighlight = isNewPrRow
                   ? 'lap-pr-row-celebrate'
                   : showAsBest
-                    ? 'bg-red-950/25 md:bg-red-950/30'
+                    ? lapBestRowHighlight
                     : ''
                 const mobileCardBg = isHighlighted
-                  ? 'max-md:bg-red-950/35 max-md:border-l-4 max-md:border-l-red-500/80 max-md:shadow-[inset_4px_0_0_0_rgba(213,0,0,0.75)]'
-                  : 'max-md:bg-slate-900/70'
-                const bestRowAccent = showAsBest
-                  ? 'md:shadow-[inset_4px_0_0_0_#d50000]'
-                  : ''
+                  ? `${lapBestRowHighlightMobile} max-md:border-l-4`
+                  : fillCardMobile
                 return (
                   <article
                     key={lap.id}
-                    className={`rounded-xl border border-slate-700/90 p-3.5 shadow-sm md:rounded-none md:border-0 md:p-0 md:shadow-none md:grid md:grid-cols-[1.4fr_0.9fr_0.8fr_0.8fr_1.2fr_0.5fr] md:items-center md:gap-3 md:px-6 md:py-4 ${mobileCardBg} ${rowHighlight} ${bestRowAccent}`}
+                    className={`rounded-xl border p-3.5 shadow-sm md:rounded-none md:border-0 md:p-0 md:shadow-none md:grid md:grid-cols-[1.4fr_0.9fr_0.8fr_0.8fr_1.2fr_0.5fr] md:items-center md:gap-3 md:px-6 md:py-4 ${borderDefault} ${mobileCardBg} ${rowHighlight}`}
                   >
                     {/* Mobiel: compacte kaart */}
                     <div className="md:hidden">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-semibold text-white">
+                          <p className={`truncate text-sm font-semibold ${cardText}`}>
                             {lap.trackName}
                             {showAsBest && (
                               <span
@@ -698,27 +727,27 @@ export default function LapTracker() {
                               </span>
                             )}
                           </p>
-                          <p className="mt-1 font-mono text-2xl font-bold leading-none text-red-300">
+                          <p className="mt-1 font-mono text-2xl font-bold leading-none text-[#d50000] dark:text-red-300">
                             {lap.time}
                           </p>
                         </div>
                         <button
                           type="button"
                           onClick={() => requestDelete(lap)}
-                          className="shrink-0 rounded-lg border border-slate-600 bg-slate-800/80 px-2.5 py-1.5 text-[11px] font-semibold text-slate-200 transition-colors hover:border-red-500 hover:bg-red-950/50 hover:text-red-100"
+                          className={`shrink-0 ${secondaryButton} px-2.5 py-1.5 text-[11px] hover:border-red-500 hover:bg-red-50 hover:text-red-800 dark:hover:bg-red-950/50 dark:hover:text-red-100`}
                         >
                           Verwijder
                         </button>
                       </div>
-                      <p className="mt-2.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-slate-400">
+                      <p className={`mt-2.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs ${textFaint}`}>
                         <span>{formatDateNl(lap.date)}</span>
-                        <span className="text-slate-600" aria-hidden>
+                        <span className="text-slate-400 dark:text-slate-600" aria-hidden>
                           ·
                         </span>
                         <span>{lap.kartType}</span>
                         {lap.note ? (
                           <>
-                            <span className="shrink-0 text-slate-600" aria-hidden>
+                            <span className="shrink-0 text-slate-400 dark:text-slate-600" aria-hidden>
                               ·
                             </span>
                             <span className="min-w-0 max-w-[50%] flex-1">
@@ -727,7 +756,7 @@ export default function LapTracker() {
                                 rowId={`${lap.id}-note-mobile`}
                                 isOpen={openNote?.rowId === `${lap.id}-note-mobile`}
                                 onOpen={handleNoteOpen}
-                                textClassName="text-slate-300"
+                                textClassName={cardTextMuted}
                               />
                             </span>
                           </>
@@ -738,7 +767,7 @@ export default function LapTracker() {
                     {/* Desktop: tabelrij */}
                     <div className="hidden md:contents">
                       <div>
-                        <p className="font-medium text-white">
+                        <p className={`font-medium ${cardText}`}>
                           {lap.trackName}
                           {showAsBest && (
                             <span
@@ -758,7 +787,7 @@ export default function LapTracker() {
                         <p>{formatDateNl(lap.date)}</p>
                       </div>
                       <div>
-                        <p className="font-mono font-semibold text-red-300">{lap.time}</p>
+                        <p className="font-mono font-semibold text-[#d50000] dark:text-red-300">{lap.time}</p>
                       </div>
                       <div>
                         <p>{lap.kartType}</p>
@@ -769,14 +798,14 @@ export default function LapTracker() {
                           rowId={`${lap.id}-note`}
                           isOpen={openNote?.rowId === `${lap.id}-note`}
                           onOpen={handleNoteOpen}
-                          textClassName="text-slate-400"
+                          textClassName={textFaint}
                         />
                       </div>
                       <div className="text-center">
                         <button
                           type="button"
                           onClick={() => requestDelete(lap)}
-                          className="rounded border border-slate-600 px-3 py-1.5 text-xs text-slate-300 transition-colors hover:border-red-500 hover:bg-red-950/40 hover:text-red-200"
+                          className={`${secondaryButton} px-3 py-1.5 text-xs hover:border-red-500 hover:bg-red-50 hover:text-red-800 dark:hover:bg-red-950/40 dark:hover:text-red-200`}
                         >
                           Verwijderen
                         </button>
@@ -865,8 +894,8 @@ function DeleteWarningIcon({ intense }) {
     <span
       className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-full border-2 ${
         intense
-          ? 'border-red-500/60 bg-red-950/80 shadow-[0_0_24px_rgba(213,0,0,0.35)]'
-          : 'border-amber-500/40 bg-slate-800/90'
+          ? 'border-red-500/60 bg-amber-50 shadow-[0_0_24px_rgba(213,0,0,0.2)] dark:bg-red-950/80 dark:shadow-[0_0_24px_rgba(213,0,0,0.35)]'
+          : 'border-amber-500/40 bg-amber-50/90 dark:bg-slate-800/90'
       }`}
       aria-hidden
     >
@@ -909,11 +938,11 @@ function LapDeleteConfirm({ lap, onCancel, onConfirm }) {
       >
         <button
           type="button"
-          className="lap-modal-backdrop-enter absolute inset-0 bg-slate-950/92 backdrop-blur-md"
+          className={`lap-modal-backdrop-enter ${modalBackdropStrong}`}
           onClick={onCancel}
           aria-label="Annuleren"
         />
-        <div className="lap-modal-panel-enter lap-delete-panel-pulse relative w-full max-w-lg overflow-hidden rounded-2xl border-2 border-red-500/50 bg-gradient-to-b from-slate-900 via-slate-950 to-slate-900">
+        <div className={`lap-modal-panel-enter lap-delete-panel-pulse relative w-full max-w-lg overflow-hidden rounded-2xl ${lapPrDeletePanel}`}>
           <div
             className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(213,0,0,0.18),transparent_55%)]"
             aria-hidden
@@ -928,7 +957,7 @@ function LapDeleteConfirm({ lap, onCancel, onConfirm }) {
                 </p>
                 <h2
                   id="lap-delete-title"
-                  className="mt-1 text-2xl font-extrabold leading-tight tracking-tight text-white md:text-[1.65rem]"
+                  className={`mt-1 text-2xl font-extrabold leading-tight tracking-tight md:text-[1.65rem] ${cardText}`}
                 >
                   Beste tijd op {trackName} verwijderen?
                 </h2>
@@ -937,21 +966,21 @@ function LapDeleteConfirm({ lap, onCancel, onConfirm }) {
 
             <p
               id="lap-delete-desc"
-              className="mt-5 text-base leading-relaxed text-slate-300 md:text-lg"
+              className={`mt-5 text-base leading-relaxed md:text-lg ${textMuted}`}
             >
               Weet je zeker dat je je{' '}
-              <span className="bg-gradient-to-r from-red-200 via-white to-red-200 bg-clip-text font-bold italic text-transparent">
+              <span className="font-bold italic text-red-600 dark:bg-gradient-to-r dark:from-red-200 dark:via-white dark:to-red-200 dark:bg-clip-text dark:text-transparent">
                 persoonlijke record
               </span>{' '}
               op deze baan definitief wilt verwijderen?
             </p>
 
-            <div className="mt-4 flex gap-3 rounded-xl border-2 border-amber-500/50 bg-amber-950/50 px-4 py-3.5 shadow-[inset_0_0_24px_rgba(245,158,11,0.08)]">
+            <div className="mt-4 flex gap-3 rounded-xl border-2 border-amber-500/50 bg-amber-50 px-4 py-3.5 shadow-[inset_0_0_24px_rgba(245,158,11,0.08)] dark:bg-amber-950/50">
               <span className="text-2xl" aria-hidden>
                 🏆
               </span>
-              <p className="text-sm font-semibold leading-snug text-amber-100 md:text-base">
-                Dit is je snelste rondetijd op <strong className="text-amber-50">{trackName}</strong>
+              <p className="text-sm font-semibold leading-snug text-amber-900 md:text-base dark:text-amber-100">
+                Dit is je snelste rondetijd op <strong className="text-amber-950 dark:text-amber-50">{trackName}</strong>
                 . Na verwijderen verandert je beste tijd op deze baan — dit kan niet ongedaan
                 worden gemaakt.
               </p>
@@ -976,11 +1005,11 @@ function LapDeleteConfirm({ lap, onCancel, onConfirm }) {
     >
       <button
         type="button"
-        className="lap-modal-backdrop-enter absolute inset-0 bg-slate-950/88 backdrop-blur-sm"
+        className={`lap-modal-backdrop-enter ${modalBackdrop}`}
         onClick={onCancel}
         aria-label="Annuleren"
       />
-      <div className="lap-modal-panel-enter relative w-full max-w-md overflow-hidden rounded-xl border border-slate-600 bg-slate-900 shadow-2xl shadow-black/50">
+      <div className={`lap-modal-panel-enter w-full max-w-md ${modalPanel}`}>
         <div className="h-0.5 bg-red-600/80" aria-hidden />
         <div className="relative px-5 py-5 md:px-6 md:py-6">
           <div className="flex items-center gap-3">
@@ -991,16 +1020,16 @@ function LapDeleteConfirm({ lap, onCancel, onConfirm }) {
               </p>
               <h2
                 id="lap-delete-title"
-                className="mt-1 text-xl font-bold leading-tight text-white"
+                className={`mt-1 text-xl font-bold leading-tight ${cardText}`}
               >
                 Deze rondetijd verwijderen?
               </h2>
             </div>
           </div>
 
-          <p id="lap-delete-desc" className="mt-4 text-base leading-relaxed text-slate-200">
+          <p id="lap-delete-desc" className={`mt-4 text-base leading-relaxed ${cardTextMuted}`}>
             Weet je zeker dat je deze rondetijd wilt verwijderen? Dit is niet je persoonlijke
-            record op <span className="font-semibold text-white">{trackName}</span>.
+            record op <span className={`font-semibold ${cardText}`}>{trackName}</span>.
           </p>
 
           <LapDeleteSummary trackName={trackName} time={time} date={date} intense={false} />
@@ -1017,34 +1046,30 @@ function LapDeleteSummary({ trackName, time, date, intense }) {
     <div
       className={
         intense
-          ? 'mt-5 rounded-xl border border-slate-600/80 bg-slate-950/90 px-5 py-4 shadow-inner'
-          : 'mt-4 rounded-lg border border-slate-600 bg-slate-800 px-4 py-3.5'
+          ? `mt-5 rounded-xl border ${borderDefault} ${surface} px-5 py-4 shadow-inner`
+          : `mt-4 rounded-lg border ${borderDefault} ${surface} px-4 py-3.5`
       }
     >
       <p
-        className={`text-[10px] font-bold uppercase tracking-[0.2em] ${
-          intense ? 'text-slate-500' : 'text-slate-400'
-        }`}
+        className={`text-[10px] font-bold uppercase tracking-[0.2em] ${textFaint}`}
       >
         Te verwijderen ronde
       </p>
       <p
-        className={`mt-1 font-bold text-white ${intense ? 'text-xl md:text-2xl' : 'text-lg'}`}
+        className={`mt-1 font-bold ${cardText} ${intense ? 'text-xl md:text-2xl' : 'text-lg'}`}
       >
         {trackName}
       </p>
       <div className="mt-2 flex flex-wrap items-end gap-5">
         <div>
           <p
-            className={`text-[10px] font-semibold uppercase tracking-wider ${
-              intense ? 'text-slate-500' : 'text-slate-400'
-            }`}
+            className={`text-[10px] font-semibold uppercase tracking-wider ${textFaint}`}
           >
             Tijd
           </p>
           <p
             className={`font-mono font-bold ${
-              intense ? 'text-2xl text-red-300 md:text-3xl' : 'text-xl text-white'
+              intense ? 'text-2xl text-red-500 md:text-3xl dark:text-red-300' : `text-xl ${cardText}`
             }`}
           >
             {time}
@@ -1052,13 +1077,11 @@ function LapDeleteSummary({ trackName, time, date, intense }) {
         </div>
         <div>
           <p
-            className={`text-[10px] font-semibold uppercase tracking-wider ${
-              intense ? 'text-slate-500' : 'text-slate-400'
-            }`}
+            className={`text-[10px] font-semibold uppercase tracking-wider ${textFaint}`}
           >
             Datum
           </p>
-          <p className={`font-medium text-slate-100 ${intense ? 'text-base' : 'text-sm'}`}>
+          <p className={`font-medium ${cardTextMuted} ${intense ? 'text-base' : 'text-sm'}`}>
             {formatDateNl(date)}
           </p>
         </div>
@@ -1077,10 +1100,10 @@ function LapDeleteActions({ onCancel, onConfirm, intense }) {
       <button
         type="button"
         onClick={onCancel}
-        className={`font-bold transition-colors hover:bg-slate-700 ${
+        className={`font-bold transition-colors ${
           intense
-            ? 'rounded-xl border-2 border-slate-600 px-5 py-3 text-sm text-slate-100 hover:border-slate-400'
-            : 'rounded-lg border border-slate-500 bg-slate-800 px-4 py-2.5 text-sm text-white hover:border-slate-400'
+            ? `rounded-xl border-2 px-5 py-3 text-sm ${secondaryButton} hover:border-slate-400`
+            : secondaryButton
         }`}
       >
         Nee, behouden
@@ -1118,14 +1141,11 @@ function LapPrCelebration({ celebration, exiting }) {
       role="status"
       aria-live="polite"
       aria-label={ariaMessage}
-      className={`relative mb-6 overflow-hidden rounded-xl border-2 border-purple-500/50 bg-gradient-to-br from-slate-950 via-red-950/70 to-purple-950/55 ${
+      className={`relative mb-6 overflow-hidden rounded-xl ${lapPrBanner} ${
         exiting ? 'lap-pr-banner-exit' : 'lap-pr-banner-enter lap-pr-glow-active'
       }`}
     >
-      <div
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_left,rgba(213,0,0,0.22),transparent_50%),radial-gradient(ellipse_at_right,rgba(168,85,247,0.18),transparent_50%)]"
-        aria-hidden
-      />
+      <div className="lap-pr-banner-radial" aria-hidden />
       <div
         className="pointer-events-none absolute inset-x-0 top-0 h-1 opacity-95"
         style={{
@@ -1140,7 +1160,7 @@ function LapPrCelebration({ celebration, exiting }) {
         <div className="lap-pr-checkered-edge w-3 shrink-0 opacity-95" aria-hidden />
         <div className="min-w-0 flex-1 px-4 py-3 md:px-5 md:py-3.5">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className="inline-flex items-center gap-1.5 rounded-md border border-purple-400/60 bg-purple-500/20 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-[0.22em] text-purple-100">
+            <span className="inline-flex items-center gap-1.5 rounded-md border border-purple-400/60 bg-purple-500/15 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-[0.22em] text-purple-800 dark:bg-purple-500/20 dark:text-purple-100">
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-purple-300" aria-hidden />
               Fastest Lap
             </span>
@@ -1150,38 +1170,38 @@ function LapPrCelebration({ celebration, exiting }) {
           </div>
 
           <div className="mt-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-red-300/90">
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-red-600/90 dark:text-red-300/90">
               {isFirstOnTrack ? 'Eerste ronde' : 'Nieuw PR'}
             </p>
-            <h2 className="break-words text-xl font-extrabold leading-tight tracking-tight text-white md:text-2xl">
+            <h2 className={`break-words text-xl font-extrabold leading-tight tracking-tight md:text-2xl ${cardText}`}>
               {trackName}
             </h2>
           </div>
 
           <div className="mt-2.5 flex flex-wrap items-center gap-2.5">
-            <div className="rounded-lg border border-red-500/30 bg-slate-950/50 px-3 py-1.5">
-              <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500">
+            <div className={`rounded-lg border border-red-500/30 px-3 py-1.5 ${surface}`}>
+              <p className={`text-[9px] font-bold uppercase tracking-wider ${textFaint}`}>
                 Nieuwe tijd
               </p>
-              <p className="font-mono text-xl font-bold leading-none text-red-300 md:text-2xl">
+              <p className="font-mono text-xl font-bold leading-none text-red-600 md:text-2xl dark:text-red-300">
                 {time}
               </p>
             </div>
             {!isFirstOnTrack && improvementFormatted && previousBestTime && (
-              <div className="rounded-lg border border-emerald-500/40 bg-emerald-950/50 px-3 py-1.5">
-                <p className="text-[9px] font-bold uppercase tracking-wider text-emerald-400/90">
+              <div className="rounded-lg border border-emerald-500/40 bg-emerald-50 px-3 py-1.5 dark:bg-emerald-950/50">
+                <p className="text-[9px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400/90">
                   Sneller
                 </p>
-                <p className="font-mono text-lg font-bold leading-none text-emerald-300 md:text-xl">
+                <p className="font-mono text-lg font-bold leading-none text-emerald-700 md:text-xl dark:text-emerald-300">
                   −{improvementFormatted}
                 </p>
-                <p className="mt-0.5 text-[11px] text-slate-500">
-                  was <span className="font-mono text-slate-400">{previousBestTime}</span>
+                <p className={`mt-0.5 text-[11px] ${textFaint}`}>
+                  was <span className={`font-mono ${textMuted}`}>{previousBestTime}</span>
                 </p>
               </div>
             )}
             {isFirstOnTrack && (
-              <p className="text-xs text-slate-400">Baseline op deze baan vastgelegd.</p>
+              <p className={`text-xs ${textFaint}`}>Baseline op deze baan vastgelegd.</p>
             )}
           </div>
         </div>
@@ -1192,13 +1212,13 @@ function LapPrCelebration({ celebration, exiting }) {
 
 function StatCard({ label, value, hint, icon }) {
   return (
-    <div className="flex min-h-[7.5rem] flex-col rounded-xl border border-slate-700 bg-slate-900/55 p-5 shadow-lg shadow-black/20">
-      <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+    <div className={`flex min-h-[7.5rem] flex-col p-5 ${statCard}`}>
+      <p className={`text-xs font-semibold uppercase tracking-wide ${textFaint}`}>
         {icon} {label}
       </p>
-      <p className="mt-2 font-mono text-xl font-bold text-white">{value}</p>
+      <p className={`mt-2 font-mono text-xl font-bold ${cardText}`}>{value}</p>
       {hint && (
-        <p className="mt-auto border-t border-slate-700/50 pt-3 text-sm font-medium text-slate-200">
+        <p className={`mt-auto pt-3 text-sm font-medium ${cardTextMuted}`}>
           {hint}
         </p>
       )}
