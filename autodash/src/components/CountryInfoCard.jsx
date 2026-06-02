@@ -1,3 +1,5 @@
+import { cardText, cardTextMuted, cardTextSoft, textFaint } from '../utils/themeClasses'
+
 const MILJOEN = 1_000_000
 const MILJARD = 1_000_000_000
 
@@ -57,28 +59,28 @@ export default function CountryInfoCard({ country }) {
           loading="lazy"
         />
       ) : null}
-      <div className="min-w-0 flex-1 space-y-2 text-sm text-slate-200">
-        <h3 className="text-lg font-bold text-white">{country.name?.common}</h3>
+      <div className={`min-w-0 flex-1 space-y-2 text-sm ${cardTextSoft}`}>
+        <h3 className={`text-lg font-bold ${cardText}`}>{country.name?.common}</h3>
         {country.name?.official ? (
-          <p className="text-slate-400">{country.name.official}</p>
+          <p className={textFaint}>{country.name.official}</p>
         ) : null}
         <p>
-          <span className="text-slate-500">Hoofdstad:</span> {country.capital?.[0] || 'Onbekend'}
+          <span className={textFaint}>Hoofdstad:</span> {country.capital?.[0] || 'Onbekend'}
         </p>
         <p>
-          <span className="text-slate-500">Bevolking:</span> {formatPopulation(country.population)}
+          <span className={textFaint}>Bevolking:</span> {formatPopulation(country.population)}
         </p>
         <p>
-          <span className="text-slate-500">Valuta:</span> {formatCurrencies(country.currencies)}
+          <span className={textFaint}>Valuta:</span> {formatCurrencies(country.currencies)}
         </p>
         <p>
-          <span className="text-slate-500">Talen:</span> {formatLanguages(country.languages)}
+          <span className={textFaint}>Talen:</span> {formatLanguages(country.languages)}
         </p>
         <p>
-          <span className="text-slate-500">Regio:</span> {country.region || 'Onbekend'}
+          <span className={textFaint}>Regio:</span> {country.region || 'Onbekend'}
         </p>
         <p>
-          <span className="text-slate-500">Tijdzone:</span> {formatTimezones(country.timezones)}
+          <span className={textFaint}>Tijdzone:</span> {formatTimezones(country.timezones)}
         </p>
       </div>
     </div>

@@ -1,32 +1,42 @@
 // Mobiele racekaart met vaste veldvolgorde: Datum, Circuit, Land, Status (+ optioneel accordion).
 import CountryInfoCard from './CountryInfoCard'
 import LoadingSpinner from './LoadingSpinner'
+import {
+  borderSubtle,
+  textFaint,
+  cardText,
+  cardTextMuted,
+  cardTextSoft,
+  fillRowOpen,
+  raceNextRow,
+  raceNextRowBadge,
+  tableRow,
+  statusUpcomingBadge,
+} from '../utils/themeClasses'
+
 function getStatusStyle(status, isNextRace = false) {
   if (isNextRace) {
     return {
-      card: 'border-[#ff1e00]/90 bg-[#181922] ring-1 ring-[#ff1e00]/60 shadow-[0_0_22px_rgba(255,30,0,0.26)]',
-      badge:
-        'min-w-[8rem] rounded-md border border-[#ff1e00] bg-[#2b1010] px-4 py-2 text-center text-sm font-extrabold text-white ring-1 ring-[#ff1e00]/60 shadow-[0_0_22px_rgba(255,30,0,0.26)]',
+      card: raceNextRow,
+      badge: `min-w-[8rem] rounded-md px-4 py-2 text-center text-sm font-extrabold ${raceNextRowBadge}`,
     }
   }
   if (status === 'Voorbij') {
     return {
-      card: 'border-slate-700 bg-slate-900/35 opacity-75',
-      badge:
-        'min-w-[6.5rem] rounded-md border border-slate-600 bg-slate-700 px-3 py-1.5 text-center text-xs font-semibold text-slate-100',
+      card: `${tableRow} theme-fill-row-open`,
+      badge: `min-w-[6.5rem] rounded-md border theme-border theme-fill-row-open px-3 py-1.5 text-center text-xs font-semibold ${cardTextMuted}`,
     }
   }
   if (status === 'Dit weekend') {
     return {
-      card: 'border-red-600/80 bg-red-950/20 ring-1 ring-red-500/25',
+      card: `${tableRow} border-red-400/80 theme-fill-muted ring-1 ring-red-400/25 dark:border-red-600/80 dark:ring-red-500/25`,
       badge:
-        'min-w-[6.5rem] rounded-md border border-red-500/90 bg-red-900/70 px-3 py-1.5 text-center text-xs font-semibold text-white',
+        'min-w-[6.5rem] rounded-md border border-red-600 bg-red-600 px-3 py-1.5 text-center text-xs font-semibold text-white dark:border-red-500/90 dark:bg-red-900/70',
     }
   }
   return {
-    card: 'border-emerald-500/70 bg-emerald-900/10',
-    badge:
-      'min-w-[6.5rem] rounded-md border border-emerald-500/80 bg-emerald-700/90 px-3 py-1.5 text-center text-xs font-semibold text-white',
+    card: tableRow,
+    badge: `min-w-[6.5rem] rounded-md border px-3 py-1.5 text-center text-xs font-semibold ${statusUpcomingBadge}`,
   }
 }
 
@@ -74,12 +84,12 @@ function RaceCountryPanel({ loading, error, country }) {
     return <LoadingSpinner message="Landinfo laden..." compact />
   }
   if (error) {
-    return <p className="text-sm text-red-300">{error}</p>
+    return <p className="text-sm text-red-600 dark:text-red-300">{error}</p>
   }
   if (country) {
     return <CountryInfoCard country={country} />
   }
-  return <p className="text-sm text-slate-500">Geen landinfo beschikbaar.</p>
+  return <p className={`text-sm ${textFaint}`}>Geen landinfo beschikbaar.</p>
 }
 
 export default function RaceCard({
@@ -104,78 +114,80 @@ export default function RaceCard({
     }
   }
 
+  const cardClass = expanded && !isNextRace ? `${statusStyle.card} ${fillRowOpen}` : statusStyle.card
+
   return (
-    <article
-      className={`rounded-2xl border shadow-md transition-colors duration-200 ${
-        expanded ? 'border-slate-600' : ''
-      } ${
-        isPastRace ? 'opacity-85 shadow-[inset_0_0_0_9999px_rgba(148,163,184,0.08)]' : ''
-      } ${statusStyle.card}`}
-    >
+    <article className={`overflow-hidden shadow-md transition-colors duration-200 ${cardClass}`}>
       <div
         role={interactive ? 'button' : undefined}
         tabIndex={interactive ? 0 : undefined}
         aria-expanded={interactive ? expanded : undefined}
         onClick={interactive ? onToggle : undefined}
         onKeyDown={handleKeyDown}
-        className={`p-7 ${interactive ? 'cursor-pointer' : ''} ${
-          expanded ? 'bg-slate-800/40' : interactive ? 'hover:bg-slate-800/30' : ''
-        }`}
+        className={`p-7 ${interactive ? 'cursor-pointer' : ''}`}
       >
-      {isNextRace && (
-        <p className="mb-5 text-xs font-bold uppercase tracking-[0.18em] text-red-300">
-          Volgende race
-        </p>
-      )}
-      <dl className="space-y-5 text-base text-slate-200">
-        <div className="grid grid-cols-[6.5rem_1fr] gap-3">
-          <dt className="text-slate-400">Datum</dt>
-          <dd className="font-medium">{formatDateRange(session?.dateStart, session?.dateEnd)}</dd>
-        </div>
-        <div className="grid grid-cols-[6.5rem_1fr] gap-3">
-          <dt className="text-slate-400">Circuit</dt> 
-          <dd>
-            <span className="block text-xl font-extrabold text-white">
-              {session?.meetingName || 'Race onbekend'}
-            </span>
-            <span className="mt-1.5 block text-base text-slate-300">
-              {session?.circuitName || 'Onbekend circuit'}
-            </span>
-          </dd>
-        </div>
-        <div className="grid grid-cols-[6.5rem_1fr] gap-3">
-          <dt className="text-slate-400">Land</dt>
-          <dd className="flex items-center gap-3">
-            {session?.countryFlag ? (
-              <img
-                src={session.countryFlag}
-                alt={session?.countryName || 'Landvlag'}
-                className="h-6 w-8 rounded-sm object-cover"
-                loading="lazy"
-              />
-            ) : (
-              <span className="h-6 w-8 rounded-sm bg-slate-600/70" />
-            )}
-            <span>{session?.countryName || 'Land onbekend'}</span>
-          </dd>
-        </div>
-        <div className="grid grid-cols-[6.5rem_1fr] gap-3">
-          <dt className="text-slate-400">Status</dt>
-          <dd className="flex items-center justify-between gap-2">
-            <span className={statusStyle.badge}>{status}</span>
-            {interactive ? (
-              <span className="shrink-0 text-red-500">
-                <ChevronIcon open={expanded} />
+        {isNextRace && (
+          <p className="mb-5 text-xs font-bold uppercase tracking-[0.18em] text-red-500">
+            Volgende race
+          </p>
+        )}
+        <dl className={`space-y-5 text-base ${isNextRace ? cardTextSoft : cardTextSoft}`}>
+          <div className="grid grid-cols-[6.5rem_1fr] gap-3">
+            <dt className={textFaint}>Datum</dt>
+            <dd className="font-medium">{formatDateRange(session?.dateStart, session?.dateEnd)}</dd>
+          </div>
+          <div className="grid grid-cols-[6.5rem_1fr] gap-3">
+            <dt className={textFaint}>Circuit</dt>
+            <dd>
+              <span
+                className={`block text-xl font-extrabold ${
+                  isPastRace && !isNextRace ? textFaint : cardText
+                }`}
+              >
+                {session?.meetingName || 'Race onbekend'}
               </span>
-            ) : null}
-          </dd>
-        </div>
-      </dl>
+              <span
+                className={`mt-1.5 block text-base ${
+                  isPastRace && !isNextRace ? textFaint : cardTextMuted
+                }`}
+              >
+                {session?.circuitName || 'Onbekend circuit'}
+              </span>
+            </dd>
+          </div>
+          <div className="grid grid-cols-[6.5rem_1fr] gap-3">
+            <dt className={textFaint}>Land</dt>
+            <dd className="flex items-center gap-3">
+              {session?.countryFlag ? (
+                <img
+                  src={session.countryFlag}
+                  alt={session?.countryName || 'Landvlag'}
+                  className="h-6 w-8 rounded-sm object-cover"
+                  loading="lazy"
+                />
+              ) : (
+                <span className="h-6 w-8 rounded-sm bg-slate-300 dark:bg-slate-600/70" />
+              )}
+              <span>{session?.countryName || 'Land onbekend'}</span>
+            </dd>
+          </div>
+          <div className="grid grid-cols-[6.5rem_1fr] gap-3">
+            <dt className={textFaint}>Status</dt>
+            <dd className="flex items-center justify-between gap-2">
+              <span className={statusStyle.badge}>{status}</span>
+              {interactive ? (
+                <span className="shrink-0 text-red-500">
+                  <ChevronIcon open={expanded} />
+                </span>
+              ) : null}
+            </dd>
+          </div>
+        </dl>
       </div>
 
       {expanded && interactive ? (
-        <div className="border-t border-slate-800/90 px-7 py-4">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+        <div className={`border-t px-7 py-4 ${borderSubtle}`}>
+          <p className={`mb-3 text-xs font-semibold uppercase tracking-wide ${textFaint}`}>
             Landinfo
           </p>
           <RaceCountryPanel loading={countryLoading} error={countryError} country={countryInfo} />

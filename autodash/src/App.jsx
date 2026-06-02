@@ -12,6 +12,7 @@ import Header, { MenuToggleIcon } from './components/Header'
 import LogoBanner from './components/LogoBanner'
 import Footer from './components/Footer'
 import ErrorMessage from './components/ErrorMessage'
+import { pageShell, surface, sidebarIconBox } from './utils/themeClasses'
 import Home, { HomeHero, HOME_HERO_HEIGHT_PX } from './pages/Home'
 import RaceCalendar from './pages/RaceCalendar'
 import DriverStandings from './pages/DriverStandings'
@@ -167,7 +168,7 @@ function AppLayout() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col overflow-x-hidden bg-slate-950 text-slate-100">
+    <div className={`flex min-h-screen flex-col overflow-x-hidden ${pageShell}`}>
       <LogoBanner heroOverlay={usesTopHeroLayout} />
 
       {isHome && <HomeHero />}
@@ -178,7 +179,7 @@ function AppLayout() {
           top: 'var(--sidebar-mid-y, calc(6rem + (100dvh - 6rem) / 2))',
         }}
         onTransitionEnd={handleDesktopAsideTransitionEnd}
-        className={`fixed left-0 z-50 hidden max-h-[min(calc(100dvh-7rem),52rem)] -translate-y-1/2 flex-col overflow-hidden rounded-r-2xl border border-slate-800 bg-slate-900 shadow-xl transition-[width] duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] will-change-[width] lg:flex ${
+        className={`fixed left-0 z-50 hidden max-h-[min(calc(100dvh-7rem),52rem)] -translate-y-1/2 flex-col overflow-hidden rounded-r-2xl shadow-xl transition-[width] duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] will-change-[width] lg:flex ${surface} ${
           menuOpen ? 'w-64' : 'w-[4.5rem]'
         }`}
       >
@@ -193,7 +194,7 @@ function AppLayout() {
       {!menuOpen && (
         <button
           type="button"
-          className="fixed right-3 top-2 z-[70] inline-flex h-11 w-11 items-center justify-center rounded-lg border border-slate-800 bg-slate-900/95 text-slate-200 shadow-lg backdrop-blur-sm transition hover:bg-slate-800 sm:top-3 lg:hidden"
+          className={`fixed right-3 top-2 z-[70] ${sidebarIconBox} shadow-lg backdrop-blur-sm transition hover:bg-slate-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-red-500/45 dark:hover:bg-slate-600 lg:hidden sm:top-3`}
           onClick={() => setMenuOpen(true)}
           aria-label="Menu openen"
         >
@@ -203,7 +204,7 @@ function AppLayout() {
 
       {menuOpen && (
         <div
-          className="fixed inset-0 z-[65] flex min-h-[100dvh] flex-col bg-slate-900 lg:hidden"
+          className={`fixed inset-0 z-[65] flex min-h-[100dvh] flex-col lg:hidden ${surface}`}
           role="dialog"
           aria-modal="true"
           aria-label="Hoofdnavigatie"
