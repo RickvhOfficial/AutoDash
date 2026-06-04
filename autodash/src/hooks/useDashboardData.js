@@ -1,19 +1,17 @@
 // Centrale dashboard-hook: cache-first render + server fetch + cache overschrijven.
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { LOADER_MIN_VISIBLE_MS } from '../constants/uiTiming'
-import { enrichDriverNationality } from '../data/driverNationalities'
 import { CACHE_KEY, readCache, readUnsplashCache, writeCache } from '../services/cacheService'
+import { fetchDashboardSnapshot } from '../services/dashboardService'
+import { enrichDriverList } from '../utils/driverList'
 import {
   buildFallbackPhotos,
   fetchDashboardBackgroundPhotos,
   getHourlyUnsplashCacheKey,
 } from '../services/unsplashService'
 
-function enrichDriverList(list) {
-  return Array.isArray(list) ? list.map(enrichDriverNationality) : []
-}
-
-const WEATHER_POLL_MS = 30000
+/** Zelfde orde als server WEATHER_TTL_MS — minder parallelle Open-Meteo-calls. */
+const WEATHER_POLL_MS = 5 * 60 * 1000
 const INITIAL_LOADING_MAX_WAIT_MS = 2200
 export function useDashboardData() {
   const cached = readCache(CACHE_KEY)
@@ -106,9 +104,7 @@ export function useDashboardData() {
       setSeasonStats((prev) => ({ ...prev, loading: prev.data.length === 0 && !prev.error, error: '' }))
 
       try {
-        const res = await fetch('/api/dashboard-snapshot', { signal })
-        if (!res.ok) throw new Error('Dashboard API tijdelijk niet beschikbaar.')
-        const data = await res.json()
+        const data = await fetchDashboardSnapshot({ signal })
         const nowTs = Date.now()
 
         if (data?.nextRace) {

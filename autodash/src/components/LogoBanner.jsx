@@ -1,6 +1,7 @@
 ﻿// Vast logo linksboven (`z-[60]`). Op home (`heroOverlay`): transparante strip over de hero; elders volle breedte met donkere balk.
 // `object-contain` + `items-center`: cutout/PNG schaalt binnen h24 zonder bij te snijden; `lg:w-64`-kolom blijft het plakgebied.
 // Balkhoogte h-24 — gelijk met `top-24` / `pt-24` in App en de desktop-sidebar.
+import SafeImg from './SafeImg'
 import { borderSubtle, pageShell } from '../utils/themeClasses'
 
 export default function LogoBanner({ heroOverlay = false }) {
@@ -16,7 +17,7 @@ export default function LogoBanner({ heroOverlay = false }) {
           href="/"
           className="block h-full w-full"
         >
-        <img
+        <SafeImg
           src="/Logo.png"
           alt="AutoDash logo"
           className="logo-banner-image box-border h-full max-h-full w-auto max-w-full object-contain object-left"

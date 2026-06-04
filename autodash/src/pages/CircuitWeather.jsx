@@ -17,7 +17,7 @@ import PageMainContent from '../components/PageMainContent'
 import WeatherCard from '../components/WeatherCard'
 import { useTheme } from '../hooks/useTheme'
 import { circuits, normalizeCircuitKey, resolveCircuitCoords } from '../data/circuits'
-import { HOME_HERO_HEIGHT_PX } from './Home'
+import { HOME_HERO_HEIGHT_PX } from '../constants/layout'
 import {
   borderDefault,
   borderSubtle,
@@ -337,8 +337,15 @@ export default function CircuitWeather() {
         })
       } catch (err) {
         if (err?.name === 'AbortError') return
-        setWeather(null)
-        setError(err?.message || 'Weerdata kon niet worden geladen.')
+        const fallbackPack = readCache(CACHE_KEY_CIRCUIT_WEATHER)
+        const fallbackEntry = fallbackPack?.circuits?.[activeCircuit.id]
+        if (fallbackEntry?.weather) {
+          setWeather(fallbackEntry.weather)
+          setError('')
+        } else {
+          setWeather(null)
+          setError(err?.message || 'Weerdata kon niet worden geladen.')
+        }
       } finally {
         if (!signal?.aborted) setLoading(false)
       }

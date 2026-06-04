@@ -28,7 +28,9 @@ import {
 
 } from '../services/vehicleService'
 
-import { HOME_HERO_HEIGHT_PX } from './Home'
+import { HOME_HERO_HEIGHT_CLASS } from '../constants/layout'
+import { useIsLgScreen } from '../hooks/useMediaQuery'
+import SafeImg from '../components/SafeImg'
 
 import {
   heroOverlay,
@@ -56,8 +58,6 @@ import {
 
 
 
-const HERO_HEIGHT_PX = HOME_HERO_HEIGHT_PX
-
 const HERO_IMG =
 
   'https://images.unsplash.com/photo-1494976388531-d105849932e9?auto=format&fit=crop&w=1920&q=80'
@@ -77,45 +77,9 @@ const inputClassName =
 
 
 
-const TABLE_GRID_STYLE = {
-  gridTemplateColumns: 'repeat(5, minmax(0, 1fr)) 2rem',
-}
+const TABLE_GRID_COLS = 'grid-cols-[repeat(5,minmax(0,1fr))_2rem]'
 
 const TABLE_GRID_GAP = 'gap-x-6 sm:gap-x-10 lg:gap-x-12'
-
-const LG_MEDIA_QUERY = '(min-width: 1024px)'
-
-
-
-function useIsLgScreen() {
-
-  const [isLg, setIsLg] = useState(
-
-    () => typeof window !== 'undefined' && window.matchMedia(LG_MEDIA_QUERY).matches
-
-  )
-
-  useEffect(() => {
-
-    const media = window.matchMedia(LG_MEDIA_QUERY)
-
-    function onChange(e) {
-
-      setIsLg(e.matches)
-
-    }
-
-    media.addEventListener('change', onChange)
-
-    return () => media.removeEventListener('change', onChange)
-
-  }, [])
-
-  return isLg
-
-}
-
-
 
 function ChevronIcon({ open }) {
 
@@ -512,9 +476,7 @@ function VehicleDesktopTable({ rows, expandedRowId, onToggleRow, trimUi }) {
 
       <div
 
-        className={`grid w-full items-center rounded-t-lg py-6 ${tableHeader} ${TABLE_GRID_GAP} ${rowPadding}`}
-
-        style={TABLE_GRID_STYLE}
+        className={`grid w-full ${TABLE_GRID_COLS} items-center rounded-t-lg py-6 ${tableHeader} ${TABLE_GRID_GAP} ${rowPadding}`}
 
       >
 
@@ -564,9 +526,7 @@ function VehicleDesktopTable({ rows, expandedRowId, onToggleRow, trimUi }) {
 
               aria-expanded={open}
 
-              className={`group grid w-full min-h-[5.25rem] cursor-pointer items-center py-5 text-left text-sm transition-colors ${TABLE_GRID_GAP} ${rowPadding}`}
-
-              style={TABLE_GRID_STYLE}
+              className={`group grid w-full ${TABLE_GRID_COLS} min-h-[5.25rem] cursor-pointer items-center py-5 text-left text-sm transition-colors ${TABLE_GRID_GAP} ${rowPadding}`}
 
             >
 
@@ -1078,30 +1038,15 @@ export default function VehicleSearch() {
 
       <div
 
-        className={`relative w-full shrink-0 border-b ${borderSubtle}`}
-
-        style={{ height: HERO_HEIGHT_PX, maxHeight: HERO_HEIGHT_PX }}
+        className={`relative w-full shrink-0 border-b ${HOME_HERO_HEIGHT_CLASS} ${borderSubtle}`}
 
       >
 
-        <img
-
+        <SafeImg
           src={HERO_IMG}
-
+          fallbackSrc={HERO_FALLBACK}
           alt="Auto op de weg — voertuig zoeker hero"
-
           className="absolute inset-0 h-full w-full object-cover"
-
-          onError={(e) => {
-
-            if (!e.currentTarget.src.endsWith(HERO_FALLBACK)) {
-
-              e.currentTarget.src = HERO_FALLBACK
-
-            }
-
-          }}
-
         />
 
         <div className={`absolute inset-0 ${heroOverlay}`} />

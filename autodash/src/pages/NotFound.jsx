@@ -1,5 +1,6 @@
 // Route: * — onbekende URL. Banner met finishvlag; 404-tekst in hetzelfde card als eerder.
 import { Link } from 'react-router-dom'
+import SafeImg from '../components/SafeImg'
 import { cardSurface, cardText, cardTextMuted, borderSubtle } from '../utils/themeClasses'
 
 // Geblokte vlag (Unsplash — standaardlicentie).
@@ -11,7 +12,7 @@ export default function NotFound() {
     <div className="flex w-full flex-1 flex-col items-center justify-center px-4 py-10 sm:px-8 sm:py-12 md:py-16">
       <div className={`w-full max-w-xl overflow-hidden rounded-xl shadow-lg backdrop-blur-sm ${cardSurface}`}>
         <div className={`relative h-[clamp(6.5rem,20vw,10.5rem)] w-full shrink-0 border-b ${borderSubtle}`}>
-          <img
+          <SafeImg
             src={FLAG_BANNER_IMG}
             alt="Geblokte finishvlag"
             className="absolute inset-0 h-full w-full object-cover object-[center_42%]"
