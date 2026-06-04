@@ -29,7 +29,8 @@ const OPEN_METEO_URL =
   process.env.VITE_OPEN_METEO_URL ||
   'https://api.open-meteo.com/v1/forecast'
 const OPENF1_TTL_MS = 30 * 60 * 1000
-const WEATHER_TTL_MS = 30 * 1000
+/** Dashboard-weer: langere TTL om Open-Meteo 429 te vermijden (was 30s). */
+const WEATHER_TTL_MS = 5 * 60 * 1000
 const RACE_CALENDAR_TTL_MS = 15 * 60 * 1000
 /** Circuit-weerpagina: server-side cache per lat/lon (Open-Meteo forecast). */
 const CIRCUIT_WEATHER_TTL_MS = 15 * 60 * 1000

@@ -3,6 +3,7 @@ import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import LoadingSpinner from '../components/LoadingSpinner'
 import PageMainContent from '../components/PageMainContent'
+import SafeImg from '../components/SafeImg'
 import { useDashboardData } from '../hooks/useDashboardData'
 import { useLapTimes } from '../hooks/useLapTimes'
 import { getHomeLapSummary } from '../utils/lapStorage'
@@ -22,21 +23,19 @@ import {
   textFaint,
   textOnPhoto,
 } from '../utils/themeClasses'
+import { HOME_HERO_HEIGHT_CLASS } from '../constants/layout'
 
 const HERO_IMG =
   'https://images.unsplash.com/photo-1728116693268-125c5d6ad9e2?auto=format&fit=crop&w=1920&q=80'
 
-export const HOME_HERO_HEIGHT_PX = 250
-
-// Bovenste hero-sectie van Home; wordt ook gebruikt voor layout-berekeningen in App.
+// Bovenste hero-sectie van Home; hoogte gekoppeld aan HOME_HERO_HEIGHT_PX in constants/layout (App sidebar).
 export function HomeHero() {
   return (
     <section
-      className={`relative w-full shrink-0 border-b ${borderSubtle}`}
-      style={{ height: HOME_HERO_HEIGHT_PX, maxHeight: HOME_HERO_HEIGHT_PX }}
+      className={`relative w-full shrink-0 border-b ${HOME_HERO_HEIGHT_CLASS} ${borderSubtle}`}
     >
       <div className="relative h-full w-full">
-        <img
+        <SafeImg
           src={HERO_IMG}
           alt="Formule 1-raceauto op het circuit — hero"
           className="absolute inset-0 h-full w-full object-cover"
@@ -88,7 +87,7 @@ export default function Home() {
     return (
       <>
         <div className={`absolute inset-0 ${homeCardFill}`} />
-        <img
+        <SafeImg
           src={imageUrl}
           alt="Formula 1 achtergrond"
           className={`${cardPhotoWrap} ${cardPhoto}`}
@@ -110,7 +109,7 @@ export default function Home() {
     return (
       <>
         <div className={`absolute inset-0 ${homeCardFill}`} />
-        <img src={circuitImage} alt="" aria-hidden="true" className={trackClass} />
+        <SafeImg src={circuitImage} alt="" aria-hidden="true" className={trackClass} />
       </>
     )
   }
@@ -150,10 +149,13 @@ export default function Home() {
                         <p className={cardTextMuted}>{nextRace.data.circuitName}</p>
                         <div className={`flex items-center gap-2 ${cardTextMuted}`}>
                           {nextRace.data.countryFlag ? (
-                            <img
+                            <SafeImg
                               src={nextRace.data.countryFlag}
                               alt={nextRace.data.countryName}
                               className="h-3 w-5 rounded-sm object-cover"
+                              fallback={
+                                <span className="h-3 w-5 rounded-sm bg-slate-500/60" aria-hidden />
+                              }
                             />
                           ) : (
                             <span className="h-3 w-5 rounded-sm bg-slate-500/60" />
@@ -235,11 +237,14 @@ export default function Home() {
                             className="flex items-center gap-2"
                           >
                             {driver.flag ? (
-                              <img
+                              <SafeImg
                                 src={driver.flag}
                                 alt=""
                                 className="h-3 w-5 rounded-sm object-cover"
                                 loading="lazy"
+                                fallback={
+                                  <span className="h-3 w-5 rounded-sm bg-slate-500/50" aria-hidden />
+                                }
                               />
                             ) : (
                               <span className="h-3 w-5 rounded-sm bg-slate-500/50" />
@@ -292,11 +297,14 @@ export default function Home() {
                             </span>
                             <div className="flex min-w-0 items-center gap-2">
                               {entry.flag ? (
-                                <img
+                                <SafeImg
                                   src={entry.flag}
                                   alt=""
                                   className="h-3 w-5 rounded-sm object-cover"
                                   loading="lazy"
+                                  fallback={
+                                    <span className="h-3 w-5 rounded-sm bg-slate-500/50" aria-hidden />
+                                  }
                                 />
                               ) : (
                                 <span className="h-3 w-5 rounded-sm bg-slate-500/50" />

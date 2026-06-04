@@ -1,3 +1,4 @@
+import SafeImg from './SafeImg'
 import { cardText, cardTextMuted, cardTextSoft, textFaint } from '../utils/themeClasses'
 
 const MILJOEN = 1_000_000
@@ -52,7 +53,7 @@ export default function CountryInfoCard({ country }) {
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-6">
       {country.flags?.png ? (
-        <img
+        <SafeImg
           src={country.flags.png}
           alt={`Vlag van ${country.name?.common || 'land'}`}
           className="h-10 w-16 shrink-0 rounded object-cover shadow"

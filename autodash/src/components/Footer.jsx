@@ -1,6 +1,7 @@
 ﻿// Voet van elke pagina. Desktop: vaste inspring gelijk aan <main> (smalle sidebar).
 // ref: voor verticale sidebar-positie (meet footer t.o.v. viewport).
 import { forwardRef } from 'react'
+import SafeImg from './SafeImg'
 import { borderSubtle, pageShell, textFaint, textMuted } from '../utils/themeClasses'
 
 const GITHUB_REPO = 'https://github.com/RickvhOfficial/AutoDash'
@@ -14,7 +15,7 @@ const Footer = forwardRef(function Footer(_props, ref) {
       className={`mt-auto h-[250px] max-h-[250px] shrink-0 overflow-hidden border-t ${borderSubtle} ${pageShell}`}
     >
       <div className="mx-auto flex h-full min-h-0 max-w-6xl flex-col justify-center overflow-y-auto px-6 py-6 text-center md:px-10 md:py-8">
-        <img
+        <SafeImg
           src="/Logo.png"
           alt="AutoDash logo"
           className="mx-auto block h-auto max-h-16 w-auto max-w-[min(100%,12rem)] shrink-0 object-contain object-center pb-3 md:pb-4"

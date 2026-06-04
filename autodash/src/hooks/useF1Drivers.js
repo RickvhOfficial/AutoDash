@@ -6,12 +6,9 @@ import {
   SNAPSHOT_STARTUP_MAX_ATTEMPTS,
   SNAPSHOT_STARTUP_RETRY_BASE_MS,
 } from '../constants/uiTiming'
-import { enrichDriverNationality } from '../data/driverNationalities'
 import { CACHE_KEY_DRIVER_STANDINGS, readCache, writeCache } from '../services/cacheService'
-
-function enrichDriverList(list) {
-  return Array.isArray(list) ? list.map(enrichDriverNationality) : []
-}
+import { fetchDashboardSnapshotForStandings } from '../services/dashboardService'
+import { enrichDriverList } from '../utils/driverList'
 
 const PAGE_DATA_POLL_MS = 30000
 
@@ -57,9 +54,7 @@ export function useF1Drivers() {
             )
           }
           try {
-            const res = await fetch('/api/dashboard-snapshot', { signal })
-            if (!res.ok) throw new Error('Coureurs konden niet worden geladen.')
-            const data = await res.json()
+            const data = await fetchDashboardSnapshotForStandings({ signal })
             list = enrichDriverList(data?.seasonStats)
             year = data?.seasonStatsYear ?? null
             lastError = null

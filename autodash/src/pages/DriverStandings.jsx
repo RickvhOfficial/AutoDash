@@ -1,16 +1,16 @@
 // Route: /standings — toont F1 coureurs-standen via server-snapshot (cached).
 import { useMemo, useState } from 'react'
 import DriverCard from '../components/DriverCard'
+import SafeImg from '../components/SafeImg'
 import DriverHeadshot from '../components/DriverHeadshot'
 import ErrorMessage from '../components/ErrorMessage'
 import LoadingSpinner from '../components/LoadingSpinner'
 import PageMainContent from '../components/PageMainContent'
 import { driverFlagUrl, resolveDriverCountryLabel } from '../data/driverNationalities'
 import { useF1Drivers } from '../hooks/useF1Drivers'
-import { HOME_HERO_HEIGHT_PX } from './Home'
+import { HOME_HERO_HEIGHT_CLASS } from '../constants/layout'
 import { heroOverlay, pageShell, borderSubtle, borderDefault, inputField, tableWrap, tableHeader, tableBody, tableRow, panel, panelMuted, textFaint, cardText, cardTextMuted, textOnPhoto } from '../utils/themeClasses'
 
-const STANDEN_HERO_HEIGHT_PX = HOME_HERO_HEIGHT_PX
 const HERO_IMG = '/standen.jpg'
 const HERO_FALLBACK = '/RaceKalender.jpg'
 
@@ -35,18 +35,13 @@ export default function DriverStandings() {
   return (
     <section className={`flex min-h-0 flex-1 flex-col ${pageShell}`}>
       <div
-        className={`relative w-full shrink-0 border-b ${borderSubtle}`}
-        style={{ height: STANDEN_HERO_HEIGHT_PX, maxHeight: STANDEN_HERO_HEIGHT_PX }}
+        className={`relative w-full shrink-0 border-b ${HOME_HERO_HEIGHT_CLASS} ${borderSubtle}`}
       >
-        <img
+        <SafeImg
           src={HERO_IMG}
+          fallbackSrc={HERO_FALLBACK}
           alt="F1 coureurs standen hero"
           className="absolute inset-0 h-full w-full object-cover"
-          onError={(e) => {
-            if (!e.currentTarget.src.endsWith(HERO_FALLBACK)) {
-              e.currentTarget.src = HERO_FALLBACK
-            }
-          }}
         />
         <div className={`absolute inset-0 ${heroOverlay}`} />
         <div className="absolute inset-x-0 bottom-0 z-10">
@@ -154,11 +149,17 @@ export default function DriverStandings() {
                       </span>
                       <span className="flex justify-center">
                         {flagSrc ? (
-                          <img
+                          <SafeImg
                             src={flagSrc}
                             alt={resolveDriverCountryLabel(driver)}
                             className={`h-5 w-7 rounded-sm border object-cover ${borderDefault}`}
                             loading="lazy"
+                            fallback={
+                              <span
+                                className={`h-5 w-7 rounded-sm border bg-slate-200 dark:bg-slate-800 ${borderDefault}`}
+                                aria-hidden
+                              />
+                            }
                           />
                         ) : (
                           <span className={`h-5 w-7 rounded-sm border bg-slate-200 dark:bg-slate-800 ${borderDefault}`} />

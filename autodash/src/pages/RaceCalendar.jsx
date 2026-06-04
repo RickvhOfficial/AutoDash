@@ -5,7 +5,8 @@ import ErrorMessage from '../components/ErrorMessage'
 import LoadingSpinner from '../components/LoadingSpinner'
 import PageMainContent from '../components/PageMainContent'
 import RaceCard from '../components/RaceCard'
-import { HOME_HERO_HEIGHT_PX } from './Home'
+import SafeImg from '../components/SafeImg'
+import { HOME_HERO_HEIGHT_CLASS } from '../constants/layout'
 import {
   LOADER_MIN_VISIBLE_MS,
   SNAPSHOT_STARTUP_MAX_ATTEMPTS,
@@ -17,7 +18,6 @@ import { getRaceCalendar } from '../services/f1Service'
 import { heroOverlay, pageShell, borderSubtle, tableWrap, tableHeaderLg, tableBody, tableRow, raceNextRow, raceNextRowBadge, panel, secondaryButton, textOnPhoto, textFaint, cardText, cardTextMuted, cardTextSoft, fillRowOpen, statusUpcomingBadge } from '../utils/themeClasses'
 
 // Zelfde hero-hoogte als Home voor consistente top-layout tussen routes.
-const RACE_HERO_HEIGHT_PX = HOME_HERO_HEIGHT_PX
 const raceHeroImage = '/RaceKalender.jpg'
 /** Zelfde interval als dashboard (`useDashboardData`): periodiek serverdata verversen. */
 const PAGE_DATA_POLL_MS = 30000
@@ -326,10 +326,9 @@ export default function RaceCalendar() {
   return (
     <section className={`flex min-h-0 flex-1 flex-col ${pageShell}`}>
       <div
-        className={`relative w-full shrink-0 border-b ${borderSubtle}`}
-        style={{ height: RACE_HERO_HEIGHT_PX, maxHeight: RACE_HERO_HEIGHT_PX }}
+        className={`relative w-full shrink-0 border-b ${HOME_HERO_HEIGHT_CLASS} ${borderSubtle}`}
       >
-        <img
+        <SafeImg
           src={raceHeroImage}
           alt="F1 racekalender hero"
           className="absolute inset-0 h-full w-full object-cover"
@@ -450,11 +449,14 @@ export default function RaceCalendar() {
                         </span>
                         <span className="flex items-center gap-3">
                           {session.countryFlag ? (
-                            <img
+                            <SafeImg
                               src={session.countryFlag}
                               alt={session.countryName}
                               className="h-6 w-8 rounded-sm object-cover"
                               loading="lazy"
+                              fallback={
+                                <span className="h-6 w-8 rounded-sm bg-slate-600/70" aria-hidden />
+                              }
                             />
                           ) : (
                             <span className="h-6 w-8 rounded-sm bg-slate-600/70" />

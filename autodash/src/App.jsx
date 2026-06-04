@@ -13,7 +13,9 @@ import LogoBanner from './components/LogoBanner'
 import Footer from './components/Footer'
 import ErrorMessage from './components/ErrorMessage'
 import { pageShell, surface, sidebarIconBox } from './utils/themeClasses'
-import Home, { HomeHero, HOME_HERO_HEIGHT_PX } from './pages/Home'
+import { HOME_HERO_HEIGHT_PX } from './constants/layout'
+import { fetchApiHealth } from './services/dashboardService'
+import Home, { HomeHero } from './pages/Home'
 import RaceCalendar from './pages/RaceCalendar'
 import DriverStandings from './pages/DriverStandings'
 import CircuitWeather from './pages/CircuitWeather'
@@ -35,8 +37,8 @@ function AppLayout() {
   // Centrale API health-check: bij backend-uitval tonen we een globale foutmelding.
   const checkApiHealth = useRef(async () => {
     try {
-      const res = await fetch('/health')
-      setApiUnavailable(!res.ok)
+      const ok = await fetchApiHealth()
+      setApiUnavailable(!ok)
     } catch {
       setApiUnavailable(true)
     }
