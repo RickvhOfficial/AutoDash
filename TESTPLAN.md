@@ -11,13 +11,13 @@
 
 ## Overzicht: twee soorten tests (gescheiden)
 
-| | **Dit document** | **Unit tests (apart)** |
-| --- | --- | --- |
-| **Type** | Handmatig testen in de browser | Geautomatiseerd met **Vitest** + React Testing Library |
-| **Wat test je** | Hele app: pagina’s, API’s, layout, gebruikersflows | Losse **componenten** en **utils** (bv. `ThemeToggle`, `lapStorage`) |
-| **ID’s** | **TC-001 t/m TC-041** | **UT-001, UT-002, …** (eigen nummering) |
-| **Uitvoeren** | `npm run dev:all` + browser | `npm run test` in `autodash/` |
-| **Document** | `TESTPLAN.md` (dit bestand) | [TESTPLAN-UNIT.md](./TESTPLAN-UNIT.md) (UT-001 t/m UT-016) |
+|                       | **Dit document**                               | **Unit tests (apart)**                                                        |
+| --------------------- | ---------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| **Type**        | Handmatig testen in de browser                       | Geautomatiseerd met**Vitest** + React Testing Library                         |
+| **Wat test je** | Hele app: pagina’s, API’s, layout, gebruikersflows | Losse**componenten** en **utils** (bv. `ThemeToggle`, `lapStorage`) |
+| **ID’s**       | **TC-001 t/m TC-041**                          | **UT-001, UT-002, …** (eigen nummering)                                      |
+| **Uitvoeren**   | `npm run dev:all` + browser                        | `npm run test` in `autodash/`                                                   |
+| **Document**    | `TESTPLAN.md` (dit bestand)                        | [TESTPLAN-UNIT.md](./TESTPLAN-UNIT.md) (UT-001 t/m UT-016)                             |
 
 Deze plannen **vullen elkaar aan**, maar horen **niet door elkaar** in één checklist: handmatige TC’s vervangen geen unit tests en omgekeerd.
 
@@ -46,7 +46,7 @@ Deze plannen **vullen elkaar aan**, maar horen **niet door elkaar** in één che
 | **Frontend-URL**  | `http://localhost:5173` (standaard Vite-poort)                                                                                        |
 | **Voorwaarden**   | Netwerk aan voor externe API’s (OpenF1, Open-Meteo, NHTSA, REST Countries, Unsplash); backend moet draaien voor F1-data en `/health` |
 | **Testdata**      | Schone `localStorage` optioneel voor karttijden-tests; anders eerst testrijen verwijderen                                             |
-| **Offline-test**  | Chrome/Firefox DevTools → Network → **Offline** (TC-032, TC-040)                                                                |
+| **Offline-test**  | Chrome/Firefox DevTools → Network →**Offline** (TC-032, TC-040)                                                                 |
 
 ### Routes (ter referentie)
 
@@ -71,86 +71,86 @@ Deze plannen **vullen elkaar aan**, maar horen **niet door elkaar** in één che
 
 ### Navigatie & Home
 
-- [ ] **TC-001** — Volledige menu-doorloop · Invoer: klik Home → Racekalender → Standen → Weer → Voertuigen → Karttijden · Verwacht: juiste URL per item; geen wit scherm
-- [ ] **TC-002** — Racekalender via menu · Invoer: klik **Racekalender** · Verwacht: URL `/races`; titel/lijst zichtbaar
-- [ ] **TC-003** — Header/logo op elke pagina · Invoer: open alle 6 routes op desktop · Verwacht: logo + navigatie; actieve link herkenbaar
-- [ ] **TC-004** — Home dashboard · Invoer: `/` met backend · Verwacht: banner + kaarten met data of duidelijke lege staat
-- [ ] **TC-005** — Home-widgets visueel · Invoer: `/` met data · Verwacht: kaarten netjes; geen overlap (desktop + mobiel)
-- [ ] **TC-006** — Footer GitHub-link · Invoer: scroll naar footer · Verwacht: **GitHub** opent repo in nieuw tabblad
+- [X] **TC-001** — Volledige menu-doorloop · Invoer: klik Home → Racekalender → Standen → Weer → Voertuigen → Karttijden · Verwacht: juiste URL per item; geen wit scherm
+- [X] **TC-002** — Racekalender via menu · Invoer: klik **Racekalender** · Verwacht: URL `/races`; titel/lijst zichtbaar
+- [X] **TC-003** — Header/logo op elke pagina · Invoer: open alle 6 routes op desktop · Verwacht: logo + navigatie; actieve link herkenbaar
+- [X] **TC-004** — Home dashboard · Invoer: `/` met backend · Verwacht: banner + kaarten met data of duidelijke lege staat
+- [X] **TC-005** — Home-widgets visueel · Invoer: `/` met data · Verwacht: kaarten netjes; geen overlap (desktop + mobiel)
+- [X] **TC-006** — Footer GitHub-link · Invoer: scroll naar footer · Verwacht: **GitHub** opent repo in nieuw tabblad
 
 ### Racekalender
 
-- [ ] **TC-007** — Races laden · Invoer: `/races` · Verwacht: min. **10** races; geen blijvende fout
-- [ ] **TC-008** — Landvlag per race · Invoer: — · Verwacht: vlag of landcode per race
+- [X] **TC-007** — Races laden · Invoer: `/races` · Verwacht: min. **10** races; geen blijvende fout
+- [X] **TC-008** — Landvlag per race · Invoer: — · Verwacht: vlag of landcode per race
 
 ### Coureurs standen
 
-- [ ] **TC-009** — Coureurs laden · Invoer: `/standings` · Verwacht: min. **10** coureurs; posities/teams zichtbaar
-- [ ] **TC-010** — Zoeken op naam · Invoer: `Max` · Verwacht: gefilterde lijst (o.a. Verstappen)
-- [ ] **TC-011** — Zoeken op team · Invoer: `Red Bull` · Verwacht: alleen dat team
-- [ ] **TC-012** — Zoekveld leegmaken · Invoer: eerst `Max`, daarna wissen · Verwacht: volledige lijst terug
+- [X] **TC-009** — Coureurs laden · Invoer: `/standings` · Verwacht: min. **10** coureurs; posities/teams zichtbaar
+- [X] **TC-010** — Zoeken op naam · Invoer: `Max` · Verwacht: gefilterde lijst (o.a. Verstappen)
+- [X] **TC-011** — Zoeken op team · Invoer: `Red Bull` · Verwacht: alleen dat team
+- [X] **TC-012** — Zoekveld leegmaken · Invoer: eerst `Max`, daarna wissen · Verwacht: volledige lijst terug
 
 ### Circuitweer
 
-- [ ] **TC-013** — Circuit kiezen · Invoer: **Zandvoort Circuit** · Verwacht: actueel weerblok zichtbaar
-- [ ] **TC-014** — 7-daagse forecast · Invoer: — · Verwacht: **7** dagen met temp., neerslag, wind
-- [ ] **TC-015** — Temperatuurgrafiek · Invoer: geladen circuit · Verwacht: lijngrafiek leesbaar (light + dark)
+- [X] **TC-013** — Circuit kiezen · Invoer: **Zandvoort Circuit** · Verwacht: actueel weerblok zichtbaar
+- [X] **TC-014** — 7-daagse forecast · Invoer: — · Verwacht: **7** dagen met temp., neerslag, wind
+- [X] **TC-015** — Temperatuurgrafiek · Invoer: geladen circuit · Verwacht: lijngrafiek leesbaar (light + dark)
 
 ### Voertuigen
 
-- [ ] **TC-016** — Geldig merk zoeken · Invoer: `Toyota` + **Zoeken** · Verwacht: modellen in tabel
-- [ ] **TC-017** — Zoeken met jaartal · Invoer: `BMW` + `2020` · Verwacht: resultaten; tabel leesbaar
-- [ ] **TC-018** — Leeg zoekveld · Invoer: `""` + **Zoeken** · Verwacht: foutmelding verplicht veld
-- [ ] **TC-019** — Geen resultaten · Invoer: `ZZZZ_Onbestaand_Merk` · Verwacht: lege staat; geen crash
+- [X] **TC-016** — Geldig merk zoeken · Invoer: `Toyota` + **Zoeken** · Verwacht: modellen in tabel
+- [X] **TC-017** — Zoeken met jaartal · Invoer: `BMW` + `2020` · Verwacht: resultaten; tabel leesbaar
+- [X] **TC-018** — Leeg zoekveld · Invoer: `""` + **Zoeken** · Verwacht: foutmelding verplicht veld
+- [X] **TC-019** — Geen resultaten · Invoer: `ZZZZ_Onbestaand_Merk` · Verwacht: lege staat; geen crash
 
 ### Karttijden
 
-- [ ] **TC-020** — Geldige tijd invoeren · Invoer: track `Testbaan`, datum vandaag, `01:23.456`, karttype · Verwacht: nieuwe rij
-- [ ] **TC-021** — Ongeldige tijd · Invoer: `abc` + opslaan · Verwacht: validatiefout; geen nieuwe rij
-- [ ] **TC-022** — Verwijderen annuleren · Invoer: delete → **Annuleren** · Verwacht: rij blijft staan
-- [ ] **TC-023** — Verwijderen bevestigen · Invoer: delete op rij van **TC-020** + bevestig · Verwacht: rij weg
-- [ ] **TC-024** — localStorage · Invoer: F5 op `/lap-tracker` · Verwacht: data nog aanwezig
-- [ ] **TC-025** — Statistieken · Invoer: ≥2 ronden zelfde track · Verwacht: beste tijd + gemiddelde
-- [ ] **TC-026** — Sorteren · Invoer: min. 2 ronden → **Beste tijd** · Verwacht: snelste bovenaan
-- [ ] **TC-027** — Filter op track · Invoer: 2 banen → kies één in **Selecteer track** · Verwacht: gefilterde lijst + stats
+- [X] **TC-020** — Geldige tijd invoeren · Invoer: track `Testbaan`, datum vandaag, `01:23.456`, karttype · Verwacht: nieuwe rij
+- [X] **TC-021** — Ongeldige tijd · Invoer: `abc` + opslaan · Verwacht: validatiefout; geen nieuwe rij
+- [X] **TC-022** — Verwijderen annuleren · Invoer: delete → **Annuleren** · Verwacht: rij blijft staan
+- [X] **TC-023** — Verwijderen bevestigen · Invoer: delete op rij van **TC-020** + bevestig · Verwacht: rij weg
+- [X] **TC-024** — localStorage · Invoer: F5 op `/lap-tracker` · Verwacht: data nog aanwezig
+- [X] **TC-025** — Statistieken · Invoer: ≥2 ronden zelfde track · Verwacht: beste tijd + gemiddelde
+- [X] **TC-026** — Sorteren · Invoer: min. 2 ronden → **Beste tijd** · Verwacht: snelste bovenaan
+- [X] **TC-027** — Filter op track · Invoer: 2 banen → kies één in **Selecteer track** · Verwacht: gefilterde lijst + stats
 
 ### Theme
 
-- [ ] **TC-028** — Dark mode toggle · Invoer: theme-knop · Verwacht: `html.dark`; donker schema
-- [ ] **TC-029** — Voorkeur onthouden · Invoer: light → refresh · Verwacht: `localStorage.theme` = `light`
-- [ ] **TC-030** — Dark op drukke pagina’s · Invoer: dark → `/lap-tracker` + `/vehicles` · Verwacht: tabellen/formulieren leesbaar
+- [X] **TC-028** — Dark mode toggle · Invoer: theme-knop · Verwacht: `html.dark`; donker schema
+- [X] **TC-029** — Voorkeur onthouden · Invoer: light → refresh · Verwacht: `localStorage.theme` = `light`
+- [X] **TC-030** — Dark op drukke pagina’s · Invoer: dark → `/lap-tracker` + `/vehicles` · Verwacht: tabellen/formulieren leesbaar
 
 ### Loading & mobiel
 
-- [ ] **TC-031** — API laadtijd · Invoer: koud openen Home/Racekalender · Verwacht: `LoadingSpinner` vóór data
-- [ ] **TC-032** — Offline F1-pagina’s · Invoer: DevTools offline → herlaad Standen/races · Verwacht: `ErrorMessage`; geen crash
-- [ ] **TC-033** — Hamburger menu · Invoer: **375px** + hamburger · Verwacht: overlay-menu open
-- [ ] **TC-034** — Racekalender mobiel · Invoer: `/races` op **375px** · Verwacht: geen horizontale scroll
-- [ ] **TC-035** — Karttijden mobiel · Invoer: `/lap-tracker` op **375px** · Verwacht: formulier + lijst bruikbaar
+- [X] **TC-031** — API laadtijd · Invoer: koud openen Home/Racekalender · Verwacht: `LoadingSpinner` vóór data
+- [X] **TC-032** — Offline F1-pagina’s · Invoer: DevTools offline → herlaad Standen/races · Verwacht: `ErrorMessage`; geen crash
+- [X] **TC-033** — Hamburger menu · Invoer: **375px** + hamburger · Verwacht: overlay-menu open
+- [X] **TC-034** — Racekalender mobiel · Invoer: `/races` op **375px** · Verwacht: geen horizontale scroll
+- [X] **TC-035** — Karttijden mobiel · Invoer: `/lap-tracker` op **375px** · Verwacht: formulier + lijst bruikbaar
 
 ### Overig
 
-- [ ] **TC-036** — 404-pagina · Invoer: `/bestaat-niet` · Verwacht: 404 + link naar Home
+- [X] **TC-036** — 404-pagina · Invoer: `/bestaat-niet` · Verwacht: 404 + link naar Home
 
 ### Fouten & omgeving *(afwijkende setup)*
 
-- [ ] **TC-037** — Backend uit · Invoer: alleen `npm run dev` → `/` of `/races` · Verwacht: fout/lege staat; geen crash
-- [ ] **TC-038** — Ongeldige VIN · Invoer: `123` of 16 tekens + decode · Verwacht: `ErrorMessage`
-- [ ] **TC-039** — Standen zonder treffer · Invoer: `ZZZ_NIEMAND` · Verwacht: lege lijst; app stabiel
-- [ ] **TC-040** — Offline weer/voertuigen · Invoer: offline → `/weather` + `/vehicles` · Verwacht: fout/geen data; geen crash
-- [ ] **TC-041** — VIN-decoder *(bonus)* · Invoer: geldige 17-teken VIN · Verwacht: resultaat in tabel
+- [X] **TC-037** — Backend uit · Invoer: alleen `npm run dev` → `/` of `/races` · Verwacht: fout/lege staat; geen crash
+- [X] **TC-038** — Ongeldige VIN · Invoer: `123` of 16 tekens + decode · Verwacht: `ErrorMessage`
+- [X] **TC-039** — Standen zonder treffer · Invoer: `ZZZ_NIEMAND` · Verwacht: lege lijst; app stabiel
+- [X] **TC-040** — Offline weer/voertuigen · Invoer: offline → `/weather` + `/vehicles` · Verwacht: fout/geen data; geen crash
+- [X] **TC-041** — VIN-decoder *(bonus)* · Invoer: geldige 17-teken VIN · Verwacht: resultaat in tabel
 
 **Totaal:** 41 testcases (TC-001 t/m TC-041, oplopend genummerd).
 
 ### Dekking foutgevoelige onderdelen (checklist)
 
-| Risico in de app                       | Gedekt door                |
-| -------------------------------------- | -------------------------- |
-| API traag/kapot                        | TC-031, TC-032, TC-037, TC-040 |
-| Ongeldige invoer (kart, voertuig, VIN) | TC-018, TC-021, TC-038     |
-| Geen zoekresultaten                    | TC-012, TC-019, TC-039     |
-| localStorage / verwijderen             | TC-022, TC-023, TC-024     |
-| Backend verplicht voor F1/weer         | TC-004, TC-007, TC-037     |
+| Risico in de app                       | Gedekt door                         |
+| -------------------------------------- | ----------------------------------- |
+| API traag/kapot                        | TC-031, TC-032, TC-037, TC-040      |
+| Ongeldige invoer (kart, voertuig, VIN) | TC-018, TC-021, TC-038              |
+| Geen zoekresultaten                    | TC-012, TC-019, TC-039              |
+| localStorage / verwijderen             | TC-022, TC-023, TC-024              |
+| Backend verplicht voor F1/weer         | TC-004, TC-007, TC-037              |
 | Responsive / theme breekt UI           | TC-003, TC-005, TC-030, TC-033–035 |
 
 ---
@@ -162,8 +162,8 @@ Deze plannen **vullen elkaar aan**, maar horen **niet door elkaar** in één che
 - [X] Testdoelen, omgeving en verwachte resultaten vastgelegd
 - [X] Eigen scenario’s toegevoegd (visueel, doorloop menu, filters, mobiel per pagina)
 - [ ] Plan goedgekeurd door **Naoufal** vóór uitvoering
-- [ ] Alle 41 testcases afgevinkt of met ❌ gedocumenteerd
-- [ ] Gefaalde tests vastgelegd in defectenlog (sectie 5)
+- [X] Alle 41 testcases afgevinkt of met ❌ gedocumenteerd
+- [X] Gefaalde tests vastgelegd in defectenlog (sectie 5)
 
 ### Goedkeuring
 
@@ -210,9 +210,9 @@ Deze plannen **vullen elkaar aan**, maar horen **niet door elkaar** in één che
 - Unit tests **niet** in de TC-checklist hierboven.
 - Uitvoeren: `cd autodash` → `npm run test`.
 
-| Wel (unit, UT) | Niet (handmatig, TC) |
-| --- | --- |
-| `isValidLapTime` / `lapTimeToMs` | Hele karttijden-pagina |
-| LoadingSpinner-tekst | API laadtijd in browser |
-| Footer toont jaar | GitHub-link klikken |
-| ErrorMessage + retry | VIN-decode via API |
+| Wel (unit, UT)                       | Niet (handmatig, TC)    |
+| ------------------------------------ | ----------------------- |
+| `isValidLapTime` / `lapTimeToMs` | Hele karttijden-pagina  |
+| LoadingSpinner-tekst                 | API laadtijd in browser |
+| Footer toont jaar                    | GitHub-link klikken     |
+| ErrorMessage + retry                 | VIN-decode via API      |
