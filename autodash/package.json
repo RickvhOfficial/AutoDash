@@ -13,7 +13,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "audit:responsive": "node scripts/responsive-audit.mjs"
+    "audit:responsive": "node scripts/responsive-audit.mjs",
+    "deploy": "cd .. && npm run deploy",
+    "deploy:preview": "cd .. && npm run deploy:preview"
   },
   "dependencies": {
     "@fortawesome/fontawesome-svg-core": "^7.2.0",
