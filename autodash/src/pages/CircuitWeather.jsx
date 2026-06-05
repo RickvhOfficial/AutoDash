@@ -16,7 +16,11 @@ import LoadingSpinner from '../components/LoadingSpinner'
 import PageMainContent from '../components/PageMainContent'
 import WeatherCard from '../components/WeatherCard'
 import { useTheme } from '../hooks/useTheme'
-import { circuits, normalizeCircuitKey, resolveCircuitCoords } from '../data/circuits'
+import {
+  buildCircuitWeatherOptions,
+  circuitIdFromRace,
+  resolveCircuitCoordsFromRace,
+} from '../data/circuits'
 import { HOME_HERO_HEIGHT_PX } from '../constants/layout'
 import {
   borderDefault,
@@ -93,9 +97,8 @@ function pickNextRaceCircuitId(races) {
     .sort((a, b) => getRaceStartTime(a) - getRaceStartTime(b))
 
   for (const race of upcoming) {
-    const name = race?.circuitName || race?.meetingName || ''
-    if (!resolveCircuitCoords(name, race?.meetingName)) continue
-    return normalizeCircuitKey(name)
+    if (!resolveCircuitCoordsFromRace(race)) continue
+    return circuitIdFromRace(race)
   }
   return ''
 }
@@ -247,29 +250,8 @@ export default function CircuitWeather() {
       try {
         const data = await getRaceCalendar(ac.signal)
         const races = Array.isArray(data?.races) ? data.races : []
-        const unique = new Map()
-
-        for (const race of races) {
-          const name = race?.circuitName || race?.meetingName || 'Circuit onbekend'
-          const id = normalizeCircuitKey(name)
-          if (!id || unique.has(id)) continue
-
-          const coords = resolveCircuitCoords(name, race?.meetingName)
-          if (!coords) continue
-
-          unique.set(id, {
-            id,
-            name,
-            place: name,
-            country: race?.countryName || 'Land onbekend',
-            lat: coords.lat,
-            lon: coords.lon,
-            dateStart: race?.dateStart || null,
-          })
-        }
-
-        const options = [...unique.values()]
-        if (!options.length) throw new Error('Geen circuits gevonden via racekalender.')
+        const options = buildCircuitWeatherOptions(races)
+        if (!options.length) throw new Error('Geen circuits gevonden.')
 
         const nextRaceId = pickNextRaceCircuitId(races)
         const defaultId =
@@ -280,17 +262,9 @@ export default function CircuitWeather() {
         setCircuitOptions(options)
         setSelectedCircuit(defaultId)
       } catch {
-        const fallback = circuits.map((c) => ({
-          id: normalizeCircuitKey(c.place || c.name),
-          name: c.name,
-          place: c.place,
-          country: c.country,
-          lat: c.lat,
-          lon: c.lon,
-          dateStart: null,
-        }))
-        setCircuitOptions(fallback)
-        setSelectedCircuit(fallback[0]?.id || '')
+        const options = buildCircuitWeatherOptions([])
+        setCircuitOptions(options)
+        setSelectedCircuit(options[0]?.id || '')
       }
     }
 
@@ -437,8 +411,7 @@ export default function CircuitWeather() {
                   Weer op F1-circuits wereldwijd — handig om te zien of het droog blijft voor de race.
                 </p>
                 <p className={`mt-2 text-sm ${textOnPhoto}`}>
-                  📍 {activeCircuit?.place || '—'}, {activeCircuit?.country || '—'} —{' '}
-                  {activeCircuit?.name || '—'}
+                  📍 {activeCircuit?.label || '—'}
                 </p>
                 <div className="relative z-[120] mt-2 block max-w-md" ref={circuitMenuRef}>
                   <span className="sr-only">Selecteer circuit</span>
@@ -451,7 +424,7 @@ export default function CircuitWeather() {
                     disabled={!activeCircuit}
                   >
                     <span className="truncate">
-                      {activeCircuit?.name || 'Circuit kiezen'} ({activeCircuit?.country || '—'})
+                      {activeCircuit?.label || 'Circuit kiezen'}
                     </span>
                     <span aria-hidden className={`ml-2 text-xs ${cardTextMuted}`}>
                       {isCircuitMenuOpen ? '▲' : '▼'}
@@ -477,7 +450,7 @@ export default function CircuitWeather() {
                                     : `${cardText} theme-dropdown-item`
                                 }`}
                               >
-                                {circuit.name} ({circuit.country})
+                                {circuit.label}
                               </button>
                             </li>
                           )

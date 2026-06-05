@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { LOADER_MIN_VISIBLE_MS } from '../constants/uiTiming'
 import { CACHE_KEY, readCache, readUnsplashCache, writeCache } from '../services/cacheService'
 import { fetchDashboardSnapshot } from '../services/dashboardService'
+import { enrichF1Race } from '../data/f1Enrichment'
 import { enrichDriverList } from '../utils/driverList'
 import {
   buildFallbackPhotos,
@@ -38,7 +39,7 @@ export function useDashboardData() {
   }
 
   const [nextRace, setNextRace] = useState(() =>
-    buildWidgetState(cached?.nextRace, null, cached?.nextRaceUpdatedAt)
+    buildWidgetState(enrichF1Race(cached?.nextRace), null, cached?.nextRaceUpdatedAt)
   )
   const [weather, setWeather] = useState(() =>
     buildWidgetState(cached?.weather, null, cached?.weatherUpdatedAt)
@@ -108,14 +109,15 @@ export function useDashboardData() {
         const nowTs = Date.now()
 
         if (data?.nextRace) {
+          const enrichedNextRace = enrichF1Race(data.nextRace)
           setNextRace({
             loading: false,
             error: '',
-            data: data.nextRace,
+            data: enrichedNextRace,
             stale: Boolean(data.stale),
             lastUpdated: data?.timestamps?.nextRaceUpdatedAt || nowTs,
           })
-          cacheUpdate.nextRace = data.nextRace
+          cacheUpdate.nextRace = enrichedNextRace
           cacheUpdate.nextRaceUpdatedAt = data?.timestamps?.nextRaceUpdatedAt || nowTs
         } else {
           setNextRace((prev) =>
