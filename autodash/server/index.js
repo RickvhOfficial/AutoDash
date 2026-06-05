@@ -18,6 +18,10 @@ import {
   enrichDriverNationality,
   resolveDriverCountryCode,
 } from '../src/data/driverNationalities.js'
+import {
+  buildOpenF1SnapshotFromErgast,
+  buildRaceCalendarFromErgast,
+} from './openf1Fallback.js'
 
 const PERSIST_FILE = process.env.VERCEL
   ? join('/tmp', 'autodash-cache.json')
@@ -192,6 +196,14 @@ async function requestJsonWithRetry(url, retries = 2, timeoutMs = 8000) {
   throw lastError || new Error(`Request failed for ${url}`)
 }
 
+function persistDashboardCache() {
+  try {
+    writeFileSync(PERSIST_FILE, JSON.stringify(dashboardCache), 'utf-8')
+  } catch {
+    /* disk write failure is non-fatal */
+  }
+}
+
 // Bouwt OpenF1 snapshot (next race, drivers, standings) met server-cache.
 async function fetchOpenF1Snapshot() {
   const nowTs = Date.now()
@@ -203,6 +215,28 @@ async function fetchOpenF1Snapshot() {
     return dashboardCache.openf1.data
   }
 
+  try {
+    return await fetchOpenF1SnapshotFromApi(nowTs)
+  } catch (error) {
+    console.warn('[OpenF1] Primary API failed:', error instanceof Error ? error.message : error)
+    if (dashboardCache.openf1.data) {
+      console.log('[OpenF1] Serving stale cache after API failure')
+      return dashboardCache.openf1.data
+    }
+    const snapshot = await buildOpenF1SnapshotFromErgast(enrichDriverNationality, new Date())
+    dashboardCache.openf1 = { updatedAt: nowTs, data: snapshot }
+    persistDashboardCache()
+    console.log(
+      '[OpenF1] Ergast fallback — nextRace:',
+      snapshot.nextRace?.meeting_name ?? 'none',
+      '| drivers:',
+      snapshot.drivers.length
+    )
+    return snapshot
+  }
+}
+
+async function fetchOpenF1SnapshotFromApi(nowTs) {
   const now = new Date()
   const year = now.getFullYear()
   const meetings = await requestJsonWithRetry(`${OPENF1_BASE}/meetings?year=${year}`)
@@ -337,9 +371,7 @@ async function fetchOpenF1Snapshot() {
     },
   }
   dashboardCache.openf1 = { updatedAt: nowTs, data: snapshot }
-  try {
-    writeFileSync(PERSIST_FILE, JSON.stringify(dashboardCache), 'utf-8')
-  } catch { /* disk write failure is non-fatal */ }
+  persistDashboardCache()
   console.log('[OpenF1] Snapshot fetched successfully — nextRace:', snapshot.nextRace?.meeting_name ?? 'none', '| drivers:', snapshot.drivers.length, '| seasonStats:', snapshot.seasonStats.length)
   return snapshot
 }
@@ -426,46 +458,66 @@ async function fetchRaceCalendarSnapshot() {
     }
   }
 
-  const now = new Date()
-  const currentYear = now.getFullYear()
-  const currentYearSessions = await fetchRaceSessionsForYear(currentYear)
-
-  const hasUpcomingCurrentYearRace = currentYearSessions.some(
-    (session) => session.date_end && new Date(session.date_end) >= now && !session.is_cancelled
-  )
-  const shouldFallbackToNextYear =
-    currentYearSessions.length === 0 || !hasUpcomingCurrentYearRace
-
-  let selectedYear = currentYear
-  let selectedSessions = currentYearSessions
-  if (shouldFallbackToNextYear) {
-    const nextYearSessions = await fetchRaceSessionsForYear(currentYear + 1)
-    if (nextYearSessions.length > 0) {
-      selectedYear = currentYear + 1
-      selectedSessions = nextYearSessions
-    }
-  }
-
-  const meetingNameByKey = await fetchMeetingNameMapForYear(selectedYear)
-
-  const mappedRaces = selectedSessions
-    .filter((session) => !session.is_cancelled)
-    .map((session) => mapRaceSession(session, meetingNameByKey, now))
-
-  dashboardCache.raceCalendar = {
-    updatedAt: nowTs,
-    seasonYear: selectedYear,
-    data: mappedRaces,
-  }
   try {
-    writeFileSync(PERSIST_FILE, JSON.stringify(dashboardCache), 'utf-8')
-  } catch {}
+    const now = new Date()
+    const currentYear = now.getFullYear()
+    const currentYearSessions = await fetchRaceSessionsForYear(currentYear)
 
-  return {
-    races: mappedRaces,
-    seasonYear: selectedYear,
-    cached: false,
-    updatedAt: nowTs,
+    const hasUpcomingCurrentYearRace = currentYearSessions.some(
+      (session) => session.date_end && new Date(session.date_end) >= now && !session.is_cancelled
+    )
+    const shouldFallbackToNextYear =
+      currentYearSessions.length === 0 || !hasUpcomingCurrentYearRace
+
+    let selectedYear = currentYear
+    let selectedSessions = currentYearSessions
+    if (shouldFallbackToNextYear) {
+      const nextYearSessions = await fetchRaceSessionsForYear(currentYear + 1)
+      if (nextYearSessions.length > 0) {
+        selectedYear = currentYear + 1
+        selectedSessions = nextYearSessions
+      }
+    }
+
+    const meetingNameByKey = await fetchMeetingNameMapForYear(selectedYear)
+
+    const mappedRaces = selectedSessions
+      .filter((session) => !session.is_cancelled)
+      .map((session) => mapRaceSession(session, meetingNameByKey, now))
+
+    dashboardCache.raceCalendar = {
+      updatedAt: nowTs,
+      seasonYear: selectedYear,
+      data: mappedRaces,
+    }
+    persistDashboardCache()
+
+    return {
+      races: mappedRaces,
+      seasonYear: selectedYear,
+      cached: false,
+      updatedAt: nowTs,
+    }
+  } catch (error) {
+    console.warn('[RaceCalendar] Primary API failed:', error instanceof Error ? error.message : error)
+    if (cachedCalendarData.length > 0) {
+      console.log('[RaceCalendar] Serving stale cache after API failure')
+      return {
+        races: cachedCalendarData,
+        seasonYear: dashboardCache.raceCalendar.seasonYear,
+        cached: true,
+        updatedAt: dashboardCache.raceCalendar.updatedAt,
+      }
+    }
+    const fallback = await buildRaceCalendarFromErgast(new Date())
+    dashboardCache.raceCalendar = {
+      updatedAt: fallback.updatedAt,
+      seasonYear: fallback.seasonYear,
+      data: fallback.races,
+    }
+    persistDashboardCache()
+    console.log('[RaceCalendar] Ergast fallback — races:', fallback.races.length)
+    return fallback
   }
 }
 
@@ -486,18 +538,23 @@ async function fetchWeatherSnapshot(nextRace) {
   }
 
   let coords = null
-  try {
-    const geo = await requestJsonWithRetry(
-      `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(
-        nextRace.location
-      )}&count=1&language=en&format=json`
-    )
-    const hit = geo?.results?.[0]
-    if (Number.isFinite(hit?.latitude) && Number.isFinite(hit?.longitude)) {
-      coords = { latitude: hit.latitude, longitude: hit.longitude }
+  if (Number.isFinite(nextRace.latitude) && Number.isFinite(nextRace.longitude)) {
+    coords = { latitude: nextRace.latitude, longitude: nextRace.longitude }
+  }
+  if (!coords) {
+    try {
+      const geo = await requestJsonWithRetry(
+        `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(
+          nextRace.location
+        )}&count=1&language=en&format=json`
+      )
+      const hit = geo?.results?.[0]
+      if (Number.isFinite(hit?.latitude) && Number.isFinite(hit?.longitude)) {
+        coords = { latitude: hit.latitude, longitude: hit.longitude }
+      }
+    } catch {
+      // no-op
     }
-  } catch {
-    // no-op
   }
   if (!coords) coords = CIRCUIT_COORDS[nextRace.circuit_short_name] || null
   if (!coords) return { weather: null, weatherUpdatedAt: 0 }
