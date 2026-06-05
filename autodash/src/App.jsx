@@ -6,29 +6,38 @@
 
 const LOGO_BOTTOM_PX = 96
 // -----------------------------------------------------------------------------
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { lazy, Suspense, startTransition, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom'
+import { SpeedInsights } from '@vercel/speed-insights/react'
 import Header, { MenuToggleIcon } from './components/Header'
 import LogoBanner from './components/LogoBanner'
 import Footer from './components/Footer'
 import ErrorMessage from './components/ErrorMessage'
+import HomeHero from './components/HomeHero'
+import LoadingSpinner from './components/LoadingSpinner'
 import { pageShell, surface, sidebarIconBox } from './utils/themeClasses'
 import { HOME_HERO_HEIGHT_PX } from './constants/layout'
 import { fetchApiHealth } from './services/dashboardService'
-import Home, { HomeHero } from './pages/Home'
-import RaceCalendar from './pages/RaceCalendar'
-import DriverStandings from './pages/DriverStandings'
-import CircuitWeather from './pages/CircuitWeather'
-import VehicleSearch from './pages/VehicleSearch'
-import LapTracker from './pages/LapTracker'
-import MotorsportNews from './pages/MotorsportNews'
-import NotFound from './pages/NotFound'
+
+const Home = lazy(() => import('./pages/Home'))
+const RaceCalendar = lazy(() => import('./pages/RaceCalendar'))
+const DriverStandings = lazy(() => import('./pages/DriverStandings'))
+const CircuitWeather = lazy(() => import('./pages/CircuitWeather'))
+const VehicleSearch = lazy(() => import('./pages/VehicleSearch'))
+const LapTracker = lazy(() => import('./pages/LapTracker'))
+const MotorsportNews = lazy(() => import('./pages/MotorsportNews'))
+const NotFound = lazy(() => import('./pages/NotFound'))
 
 function AppLayout() {
   const location = useLocation()
 
   // true = sidebar uitgeklapt (desktop) of mobiel menu zichtbaar
   const [menuOpen, setMenuOpen] = useState(false)
+  const setMenuOpenDeferred = useCallback((value) => {
+    startTransition(() => {
+      setMenuOpen(value)
+    })
+  }, [])
   // Desktop: pas na width-transitie narrow-layout (gecentreerde iconen); tijdens animatie links voor soepelere beweging
   const [sidebarWidthAnimDone, setSidebarWidthAnimDone] = useState(true)
   const prevMenuOpenRef = useRef(menuOpen)
@@ -77,7 +86,7 @@ function AppLayout() {
         e.key === 'Escape' &&
         window.matchMedia('(max-width: 1023px)').matches
       ) {
-        setMenuOpen(false)
+        setMenuOpenDeferred(false)
       }
     }
     window.addEventListener('keydown', onEscape)
@@ -104,6 +113,8 @@ function AppLayout() {
 
   useLayoutEffect(() => {
     const isHomeRoute = location.pathname === '/'
+    let rafId = 0
+
     function updateSidebarMid() {
       if (!window.matchMedia('(min-width: 1024px)').matches) {
         document.documentElement.style.removeProperty('--sidebar-mid-y')
@@ -111,7 +122,6 @@ function AppLayout() {
       }
       const footerEl = footerRef.current
       const vh = window.innerHeight
-      // Op home loopt de hero 250px over de bovenkant; sidebar verticaal centreren tussen hero-onderkant en footer, niet tussen logo en footer (anders overlapte de hero).
       const bandTop = isHomeRoute ? HOME_HERO_HEIGHT_PX : LOGO_BOTTOM_PX
       let bandBottom = vh
       if (footerEl) {
@@ -123,21 +133,30 @@ function AppLayout() {
       document.documentElement.style.setProperty('--sidebar-mid-y', `${midY}px`)
     }
 
+    function scheduleSidebarMid() {
+      if (rafId) return
+      rafId = window.requestAnimationFrame(() => {
+        rafId = 0
+        updateSidebarMid()
+      })
+    }
+
     updateSidebarMid()
     const footerEl = footerRef.current
     const ro =
       footerEl && typeof ResizeObserver !== 'undefined'
-        ? new ResizeObserver(updateSidebarMid)
+        ? new ResizeObserver(scheduleSidebarMid)
         : null
     if (footerEl && ro) ro.observe(footerEl)
-    window.addEventListener('resize', updateSidebarMid)
-    window.addEventListener('scroll', updateSidebarMid, { passive: true })
+    window.addEventListener('resize', scheduleSidebarMid, { passive: true })
+    window.addEventListener('scroll', scheduleSidebarMid, { passive: true })
 
     return () => {
+      if (rafId) window.cancelAnimationFrame(rafId)
       if (footerEl && ro) ro.unobserve(footerEl)
       ro?.disconnect()
-      window.removeEventListener('resize', updateSidebarMid)
-      window.removeEventListener('scroll', updateSidebarMid)
+      window.removeEventListener('resize', scheduleSidebarMid)
+      window.removeEventListener('scroll', scheduleSidebarMid)
       document.documentElement.style.removeProperty('--sidebar-mid-y')
     }
   }, [location.pathname])
@@ -190,7 +209,7 @@ function AppLayout() {
       >
         <Header
           menuOpen={menuOpen}
-          setMenuOpen={setMenuOpen}
+          setMenuOpen={setMenuOpenDeferred}
           desktopSidebarCollapseSettled={sidebarWidthAnimDone}
         />
       </aside>
@@ -200,7 +219,7 @@ function AppLayout() {
         <button
           type="button"
           className={`fixed right-3 top-2 z-[70] ${sidebarIconBox} shadow-lg backdrop-blur-sm transition hover:bg-slate-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-red-500/45 dark:hover:bg-slate-600 lg:hidden sm:top-3`}
-          onClick={() => setMenuOpen(true)}
+          onClick={() => setMenuOpenDeferred(true)}
           aria-label="Menu openen"
         >
           <MenuToggleIcon open={false} />
@@ -217,7 +236,7 @@ function AppLayout() {
           <Header
             variant="overlay"
             menuOpen={menuOpen}
-            setMenuOpen={setMenuOpen}
+            setMenuOpen={setMenuOpenDeferred}
           />
         </div>
       )}
@@ -247,20 +266,25 @@ function AppLayout() {
             </div>
           </div>
         ) : (
-          <div
-            key={location.pathname}
-            className="page-transition-enter flex min-h-0 flex-1 flex-col"
-          >
-            <Routes>
-              <Route path="/" element={<Home />} />
-              <Route path="/races" element={<RaceCalendar />} />
-              <Route path="/standings" element={<DriverStandings />} />
-              <Route path="/weather" element={<CircuitWeather />} />
-              <Route path="/vehicles" element={<VehicleSearch />} />
-              <Route path="/lap-tracker" element={<LapTracker />} />
-              <Route path="/news" element={<MotorsportNews />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
+          <div className="page-transition-enter flex min-h-0 flex-1 flex-col">
+            <Suspense
+              fallback={
+                <div className="flex flex-1 items-center justify-center py-16">
+                  <LoadingSpinner />
+                </div>
+              }
+            >
+              <Routes>
+                <Route path="/" element={<Home />} />
+                <Route path="/races" element={<RaceCalendar />} />
+                <Route path="/standings" element={<DriverStandings />} />
+                <Route path="/weather" element={<CircuitWeather />} />
+                <Route path="/vehicles" element={<VehicleSearch />} />
+                <Route path="/lap-tracker" element={<LapTracker />} />
+                <Route path="/news" element={<MotorsportNews />} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </Suspense>
           </div>
         )}
       </main>
@@ -274,6 +298,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <AppLayout />
+      <SpeedInsights />
     </BrowserRouter>
   )
 }
