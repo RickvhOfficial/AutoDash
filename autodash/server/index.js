@@ -19,7 +19,9 @@ import {
   resolveDriverCountryCode,
 } from '../src/data/driverNationalities.js'
 
-const PERSIST_FILE = join(__serverDir, 'cache.json')
+const PERSIST_FILE = process.env.VERCEL
+  ? join('/tmp', 'autodash-cache.json')
+  : join(__serverDir, 'cache.json')
 
 const app = express()
 const PORT = Number(process.env.PORT || 8787)
@@ -830,9 +832,7 @@ app.post('/api/models-enrich', async (req, res) => {
   }
 })
 
-const server = app.listen(PORT, () => {
-  console.log(`AutoDash API running on http://localhost:${PORT}`)
-  console.log('[Vehicle] Zoeken met EPA-verrijking (v2) actief')
+function runStartupWarmup() {
   preloadCatalogBrands().catch((err) =>
     console.warn('[Startup] Catalog preload failed:', err.message)
   )
@@ -840,11 +840,23 @@ const server = app.listen(PORT, () => {
     console.warn('[Startup] Dashboard snapshot warmup failed:', err.message)
   )
   fetchHourlyPhotosFromUnsplash().catch(() => {})
-})
+}
 
-server.on('close', () => {
-  console.log('AutoDash API server closed.')
-})
+export default app
 
-// Keep process alive in local dev shells where handles can be detached.
-setInterval(() => {}, 60 * 1000)
+if (process.env.VERCEL) {
+  runStartupWarmup()
+} else {
+  const server = app.listen(PORT, () => {
+    console.log(`AutoDash API running on http://localhost:${PORT}`)
+    console.log('[Vehicle] Zoeken met EPA-verrijking (v2) actief')
+    runStartupWarmup()
+  })
+
+  server.on('close', () => {
+    console.log('AutoDash API server closed.')
+  })
+
+  // Keep process alive in local dev shells where handles can be detached.
+  setInterval(() => {}, 60 * 1000)
+}

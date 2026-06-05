@@ -3,3 +3,5 @@ autodash/.vite/
 autodash/dist/
 autodash/coverage/
 autodash/.env.local
+.vercel
+.vercel

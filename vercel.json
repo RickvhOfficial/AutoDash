@@ -1,0 +1,11 @@
+{
+  "installCommand": "npm install --prefix autodash",
+  "buildCommand": "npm run build --prefix autodash",
+  "outputDirectory": "autodash/dist",
+  "framework": "vite",
+  "rewrites": [
+    { "source": "/health", "destination": "/api" },
+    { "source": "/api/(.*)", "destination": "/api" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
