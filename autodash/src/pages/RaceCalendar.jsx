@@ -13,6 +13,7 @@ import {
   SNAPSHOT_STARTUP_RETRY_BASE_MS,
 } from '../constants/uiTiming'
 import { CACHE_KEY_RACE_CALENDAR, readCache, writeCache } from '../services/cacheService'
+import { enrichF1Race } from '../data/f1Enrichment'
 import { getCountryFlag, getCountryInfo } from '../services/countriesService'
 import { getRaceCalendar } from '../services/f1Service'
 import { heroOverlay, pageShell, borderSubtle, tableWrap, tableHeaderLg, tableBody, tableRow, raceNextRow, raceNextRowBadge, panel, secondaryButton, textOnPhoto, textFaint, cardText, cardTextMuted, cardTextSoft, fillRowOpen, statusUpcomingBadge } from '../utils/themeClasses'
@@ -226,11 +227,11 @@ export default function RaceCalendar() {
           const enriched = await Promise.all(
             racesIn.map(async (race) => {
               const flag = await getCountryFlag(race.countryName, signal, race.countryCode)
-              return {
+              return enrichF1Race({
                 ...race,
                 countryCode: race.countryCode ?? null,
-                countryFlag: flag || '',
-              }
+                countryFlag: flag || race.countryFlag || '',
+              })
             })
           )
           enrichedRaces = enriched

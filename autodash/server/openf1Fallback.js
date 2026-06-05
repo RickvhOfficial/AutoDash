@@ -1,4 +1,6 @@
 // Fallback F1-data via Jolpica/Ergast wanneer OpenF1 geblokkeerd is (401 tijdens live sessies).
+import { enrichF1Driver, enrichF1Race } from '../src/data/f1Enrichment.js'
+
 const JOLPICA_BASE = 'https://api.jolpi.ca/ergast/f1'
 
 const CIRCUIT_ID_TO_SHORT = {
@@ -71,7 +73,7 @@ function mapErgastRaceToSession(race, now) {
   const dateEnd = ergastRaceEndIso(race)
   const circuitId = race?.Circuit?.circuitId || ''
   const circuitShort = CIRCUIT_ID_TO_SHORT[circuitId] || race?.Circuit?.circuitName || 'Circuit onbekend'
-  return {
+  return enrichF1Race({
     sessionKey: Number(race.round) || null,
     meetingName: race.raceName || 'Grand Prix',
     circuitName: race?.Circuit?.circuitName || circuitShort,
@@ -87,7 +89,7 @@ function mapErgastRaceToSession(race, now) {
     latitude: Number(race?.Circuit?.Location?.lat),
     longitude: Number(race?.Circuit?.Location?.long),
     status: toRaceStatus(dateStart, dateEnd, now),
-  }
+  })
 }
 
 async function fetchRacesForYear(year) {
@@ -142,7 +144,7 @@ export async function buildOpenF1SnapshotFromErgast(enrichDriverNationality, now
 
   const mappedSession = upcomingRaceRaw ? mapErgastRaceToSession(upcomingRaceRaw, now) : null
   const nextRace = mappedSession
-    ? {
+    ? enrichF1Race({
         meeting_name: mappedSession.meetingName,
         meeting_key: mappedSession.sessionKey,
         date_start: mappedSession.dateStart,
@@ -150,39 +152,45 @@ export async function buildOpenF1SnapshotFromErgast(enrichDriverNationality, now
         country_name: mappedSession.countryName,
         countryName: mappedSession.countryName,
         country_code: null,
-        country_flag: '',
-        countryFlag: '',
+        country_flag: mappedSession.countryFlag || '',
+        countryFlag: mappedSession.countryFlag || '',
         circuit_short_name: mappedSession.circuit_short_name,
         circuitName: mappedSession.circuitName,
+        circuit_image: mappedSession.circuitImage || null,
+        circuitImage: mappedSession.circuitImage || null,
         location: mappedSession.location,
         latitude: mappedSession.latitude,
         longitude: mappedSession.longitude,
         year: seasonYear,
-      }
+      })
     : null
 
   const seasonStats = standings.map((row) => {
     const driver = row.Driver || {}
     const fullName = `${driver.givenName || ''} ${driver.familyName || ''}`.trim() || 'Onbekend'
-    return enrichDriverNationality({
-      position: Number(row.position) || null,
-      driver_number: driver.permanentNumber || null,
-      name: fullName,
-      full_name: fullName,
-      name_acronym: driver.code || null,
-      team_name: row.Constructors?.[0]?.name || null,
-      points: Number(row.points) || 0,
-    })
+    return enrichF1Driver(
+      enrichDriverNationality({
+        position: Number(row.position) || null,
+        driver_number: driver.permanentNumber || null,
+        name: fullName,
+        full_name: fullName,
+        name_acronym: driver.code || null,
+        team_name: row.Constructors?.[0]?.name || null,
+        points: Number(row.points) || 0,
+      })
+    )
   })
 
   const drivers = [...seasonStats]
     .sort((a, b) => Number(a.driver_number) - Number(b.driver_number))
     .map((entry) =>
-      enrichDriverNationality({
-        name: entry.name,
-        number: entry.driver_number ?? '-',
-        name_acronym: entry.name_acronym,
-      })
+      enrichF1Driver(
+        enrichDriverNationality({
+          name: entry.name,
+          number: entry.driver_number ?? '-',
+          name_acronym: entry.name_acronym,
+        })
+      )
     )
 
   return {
