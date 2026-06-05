@@ -730,7 +730,13 @@ body {
 }
 
 .page-transition-enter {
-  animation: page-enter 0.35s ease-out;
+  animation: page-enter 0.15s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-transition-enter {
+    animation: none;
+  }
 }
 
 /* LapTracker: F1-stijl viering bij nieuw persoonlijk record per baan */

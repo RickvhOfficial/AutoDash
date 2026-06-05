@@ -7,10 +7,14 @@ export function ThemeProvider({ children }) {
 
   useLayoutEffect(() => {
     applyTheme(isDark)
-  }, [isDark])
+  }, [])
 
   const toggleTheme = () => {
-    setIsDark((prev) => !prev)
+    setIsDark((prev) => {
+      const next = !prev
+      applyTheme(next)
+      return next
+    })
   }
 
   return (
