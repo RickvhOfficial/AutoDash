@@ -1,20 +1,25 @@
 // AutoDash backend: levert dashboard snapshot, racekalender en hourly Unsplash-fotos.
-import 'dotenv/config'
+import dotenv from 'dotenv'
 import express from 'express'
 import cors from 'cors'
 import { readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
+
+const __serverDir = dirname(fileURLToPath(import.meta.url))
+const __rootDir = join(__serverDir, '..')
+dotenv.config({ path: join(__rootDir, '.env.local') })
+dotenv.config({ path: join(__rootDir, '.env') })
 import { resolveVinDecode, resolveVehicleSearch, resolveMakeEnrichment, applyEnrichment } from '../src/services/vehicleService.js'
 import { preloadCatalogBrands } from '../src/services/euCarCatalog.js'
+import { fetchMotorsportNewsFromProviders } from '../src/services/motorsportNewsService.js'
 import {
   driverFlagUrl,
   enrichDriverNationality,
   resolveDriverCountryCode,
 } from '../src/data/driverNationalities.js'
 
-const __dirname = dirname(fileURLToPath(import.meta.url))
-const PERSIST_FILE = join(__dirname, 'cache.json')
+const PERSIST_FILE = join(__serverDir, 'cache.json')
 
 const app = express()
 const PORT = Number(process.env.PORT || 8787)
@@ -34,6 +39,9 @@ const WEATHER_TTL_MS = 5 * 60 * 1000
 const RACE_CALENDAR_TTL_MS = 15 * 60 * 1000
 /** Circuit-weerpagina: server-side cache per lat/lon (Open-Meteo forecast). */
 const CIRCUIT_WEATHER_TTL_MS = 15 * 60 * 1000
+const MOTORSPORT_NEWS_TTL_MS = 15 * 60 * 1000
+const GNEWS_API_KEY =
+  process.env.GNEWS_API_KEY || process.env.VITE_GNEWS_API_KEY || ''
 
 const CIRCUIT_COORDS = {
   Sakhir: { latitude: 26.0325, longitude: 50.5106 },
@@ -119,6 +127,12 @@ let dashboardInFlightPromise = null
 
 /** @type {Map<string, { updatedAt: number, data: unknown }>} */
 const circuitWeatherCache = new Map()
+let motorsportNewsCache = {
+  updatedAt: 0,
+  articles: [],
+  source: null,
+}
+let motorsportNewsInFlight = null
 
 function hasEnrichedSeasonStats(openf1Data) {
   const seasonStats = openf1Data?.seasonStats
@@ -706,6 +720,52 @@ app.get('/api/race-calendar', async (_req, res) => {
         detail: error instanceof Error ? error.message : 'Unknown error',
       })
     }
+  }
+})
+
+// Motorsport nieuws (GNews NL indien key, anders RSS2JSON Autosport F1).
+app.get('/api/motorsport-news', async (_req, res) => {
+  const now = Date.now()
+  const isFresh =
+    motorsportNewsCache.articles.length >= 5 &&
+    now - motorsportNewsCache.updatedAt < MOTORSPORT_NEWS_TTL_MS
+
+  if (isFresh) {
+    res.setHeader('Cache-Control', 'public, max-age=300')
+    return res.json({
+      articles: motorsportNewsCache.articles,
+      source: motorsportNewsCache.source,
+      cached: true,
+    })
+  }
+
+  try {
+    if (!motorsportNewsInFlight) {
+      motorsportNewsInFlight = fetchMotorsportNewsFromProviders({
+        gnewsApiKey: GNEWS_API_KEY,
+      }).finally(() => {
+        motorsportNewsInFlight = null
+      })
+    }
+    const { articles, source } = await motorsportNewsInFlight
+    motorsportNewsCache = { updatedAt: now, articles, source }
+    res.setHeader('Cache-Control', 'public, max-age=300')
+    res.json({ articles, source, cached: false })
+  } catch (error) {
+    console.warn('[News] Fetch failed:', error.message)
+    if (motorsportNewsCache.articles.length >= 5) {
+      res.setHeader('Cache-Control', 'no-store')
+      return res.json({
+        articles: motorsportNewsCache.articles,
+        source: motorsportNewsCache.source,
+        cached: true,
+        stale: true,
+      })
+    }
+    res.status(502).json({
+      error: 'Motorsport nieuws tijdelijk niet beschikbaar.',
+      detail: error instanceof Error ? error.message : 'Unknown error',
+    })
   }
 })
 

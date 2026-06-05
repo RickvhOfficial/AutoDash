@@ -21,6 +21,7 @@ import DriverStandings from './pages/DriverStandings'
 import CircuitWeather from './pages/CircuitWeather'
 import VehicleSearch from './pages/VehicleSearch'
 import LapTracker from './pages/LapTracker'
+import MotorsportNews from './pages/MotorsportNews'
 import NotFound from './pages/NotFound'
 
 function AppLayout() {
@@ -89,13 +90,15 @@ function AppLayout() {
   const isCircuitWeather = location.pathname === '/weather'
   const isVehicleSearch = location.pathname === '/vehicles'
   const isLapTracker = location.pathname === '/lap-tracker'
+  const isMotorsportNews = location.pathname === '/news'
   const usesTopHeroLayout =
     isHome ||
     isRaceCalendar ||
     isDriverStandings ||
     isCircuitWeather ||
     isVehicleSearch ||
-    isLapTracker
+    isLapTracker ||
+    isMotorsportNews
 
   const footerRef = useRef(null)
 
@@ -181,7 +184,7 @@ function AppLayout() {
           top: 'var(--sidebar-mid-y, calc(6rem + (100dvh - 6rem) / 2))',
         }}
         onTransitionEnd={handleDesktopAsideTransitionEnd}
-        className={`fixed left-0 z-50 hidden max-h-[min(calc(100dvh-7rem),52rem)] -translate-y-1/2 flex-col overflow-hidden rounded-r-2xl shadow-xl transition-[width] duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] will-change-[width] lg:flex ${surface} ${
+        className={`fixed left-0 z-50 hidden max-h-[min(calc(100dvh-5rem),56rem)] -translate-y-1/2 flex-col overflow-hidden rounded-r-2xl shadow-xl transition-[width] duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] will-change-[width] lg:flex ${surface} ${
           menuOpen ? 'w-64' : 'w-[4.5rem]'
         }`}
       >
@@ -226,7 +229,8 @@ function AppLayout() {
           isDriverStandings ||
           isCircuitWeather ||
           isVehicleSearch ||
-          isLapTracker
+          isLapTracker ||
+          isMotorsportNews
             ? 'lg:pl-0'
             : 'lg:pl-[5rem]'
         } ${
@@ -254,6 +258,7 @@ function AppLayout() {
               <Route path="/weather" element={<CircuitWeather />} />
               <Route path="/vehicles" element={<VehicleSearch />} />
               <Route path="/lap-tracker" element={<LapTracker />} />
+              <Route path="/news" element={<MotorsportNews />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </div>

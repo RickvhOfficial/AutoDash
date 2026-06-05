@@ -289,6 +289,23 @@
     border: 1px solid var(--border);
     background-color: var(--card-bg);
   }
+
+  .theme-news-card {
+    border: 1px solid var(--border);
+    background-color: var(--card-bg);
+    color: var(--text-primary);
+    border-radius: 0.75rem;
+    box-shadow: var(--shadow-card);
+    transition:
+      border-color 0.2s ease,
+      box-shadow 0.2s ease,
+      transform 0.2s ease;
+  }
+  .theme-news-card:hover {
+    border-color: color-mix(in srgb, #ef4444 38%, var(--border));
+    box-shadow: var(--shadow-card-hover);
+    transform: translateY(-2px);
+  }
   .theme-card-surface {
     border: 1px solid color-mix(in srgb, var(--border) 90%, transparent);
     background-color: color-mix(in srgb, var(--card-bg) 95%, transparent);
