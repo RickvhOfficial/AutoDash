@@ -4,6 +4,7 @@ import {
   faCalendar,
   faGaugeHigh,
   faHouse,
+  faNewspaper,
   faStopwatch,
   faTrophy,
 } from '@fortawesome/free-solid-svg-icons'
@@ -13,6 +14,7 @@ export const navLinks = [
   { path: '/', label: 'Home', icon: faHouse },
   { path: '/races', label: 'Racekalender', icon: faCalendar },
   { path: '/standings', label: 'Standen', icon: faTrophy },
+  { path: '/news', label: 'Motorsport nieuws', icon: faNewspaper },
   { path: '/weather', label: 'Weer', icon: faCloudSun },
   { path: '/vehicles', label: 'Voertuigen', icon: faCar },
   { path: '/lap-tracker', label: 'Karttijden', icon: faStopwatch },

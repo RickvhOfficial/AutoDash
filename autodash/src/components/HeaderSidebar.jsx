@@ -17,7 +17,7 @@ export default function HeaderSidebar({
   const showThemeToggle = menuOpen && desktopSidebarCollapseSettled
 
   return (
-    <header className={`flex w-full flex-col ${surface}`}>
+    <header className={`flex w-full flex-col overflow-hidden rounded-r-2xl ${surface}`}>
       <div className="flex min-w-0 flex-col overflow-hidden p-2">
         <div className={`flex ${sidebarRowClass} w-full shrink-0 items-center`}>
           {showThemeToggle && <ThemeToggle showLabel />}
@@ -34,7 +34,7 @@ export default function HeaderSidebar({
           </button>
         </div>
 
-        <nav className="mt-2 max-h-[min(26rem,calc(100dvh-16rem))] overflow-x-hidden overflow-y-auto">
+        <nav className="mt-2 shrink-0 overflow-hidden">
           <ul className="space-y-2">
             {navLinks.map((link) => {
               const isActive = location.pathname === link.path

@@ -22,6 +22,7 @@ export const homeCardClass =
   'theme-home-card group relative overflow-hidden rounded-lg p-5 text-left'
 
 export const cardInteractive = 'theme-card-interactive'
+export const newsCard = 'theme-news-card'
 export const cardPhoto = 'theme-card-photo'
 export const cardPhotoWrap = 'theme-card-photo-wrap absolute inset-0 h-full w-full object-cover'
 export const cardSurface = 'theme-card-surface'
