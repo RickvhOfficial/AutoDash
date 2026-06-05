@@ -31,6 +31,7 @@ export const CIRCUIT_COORDS_BY_KEY = {
   jeddah: { lat: 21.6319, lon: 39.1044 },
   melbourne: { lat: -37.8497, lon: 144.968 },
   suzuka: { lat: 34.8431, lon: 136.541 },
+  madring: { lat: 40.4534, lon: -3.6883 },
   shanghai: { lat: 31.3389, lon: 121.2197 },
   miami: { lat: 25.9581, lon: -80.2389 },
   imola: { lat: 44.3439, lon: 11.7167 },
@@ -67,6 +68,20 @@ const CIRCUIT_KEY_ALIASES = {
   yasmarina: 'yasmarinacircuit',
   abudhabi: 'yasmarinacircuit',
   saopaulo: 'interlagos',
+  albertparkcircuit: 'melbourne',
+  albertparkgrandprixcircuit: 'melbourne',
+  japanesegrandprix: 'suzuka',
+  madrid: 'madring',
+  spanishgrandprix: 'catalunya',
+  barcelonagrandprix: 'catalunya',
+  austiangrandprix: 'spielberg',
+  belgiangrandprix: 'spafrancorchamps',
+  dutchgrandprix: 'zandvoort',
+  italiangrandprix: 'monza',
+  britishgrandprix: 'silverstone',
+  canadiangrandprix: 'montreal',
+  monacograndprix: 'montecarlo',
+  hungariangrandprix: 'hungaroring',
 }
 
 export function normalizeCircuitKey(value) {
@@ -84,6 +99,13 @@ export function resolveCircuitCoords(...keys) {
     const canonical = CIRCUIT_KEY_ALIASES[normalized] || normalized
     const direct = CIRCUIT_COORDS_BY_KEY[canonical]
     if (direct) return direct
+
+    const circuit = circuits.find((entry) => {
+      const nameKey = normalizeCircuitKey(entry.name)
+      const placeKey = normalizeCircuitKey(entry.place)
+      return normalized === nameKey || normalized === placeKey || normalized.includes(placeKey) || placeKey.includes(normalized)
+    })
+    if (circuit) return { lat: circuit.lat, lon: circuit.lon }
   }
   return null
 }

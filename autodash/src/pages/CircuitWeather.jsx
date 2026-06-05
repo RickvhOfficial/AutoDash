@@ -17,6 +17,11 @@ import PageMainContent from '../components/PageMainContent'
 import WeatherCard from '../components/WeatherCard'
 import { useTheme } from '../hooks/useTheme'
 import { circuits, normalizeCircuitKey, resolveCircuitCoords } from '../data/circuits'
+import {
+  circuitIdFromRace,
+  pickNextRaceCircuitId,
+  resolveDefaultCircuitIdFromOptions,
+} from '../utils/nextRace'
 import { HOME_HERO_HEIGHT_PX } from '../constants/layout'
 import {
   borderDefault,
@@ -46,6 +51,7 @@ import {
 } from '../services/weatherService'
 import { getRaceCalendar } from '../services/f1Service'
 import {
+  CACHE_KEY,
   CACHE_KEY_CIRCUIT_WEATHER,
   CACHE_KEY_RACE_CALENDAR,
   readCache,
@@ -64,40 +70,6 @@ function formatDayLabel(isoDate, index) {
   const d = new Date(`${isoDate}T12:00:00`)
   if (Number.isNaN(d.getTime())) return isoDate
   return d.toLocaleDateString('nl-NL', { weekday: 'short' })
-}
-
-function parseDateOnly(isoDateString) {
-  if (!isoDateString || typeof isoDateString !== 'string') return null
-  const datePart = isoDateString.split('T')[0]
-  if (!datePart) return null
-  return new Date(`${datePart}T00:00:00Z`)
-}
-
-function getRaceStartTime(session) {
-  const start = parseDateOnly(session?.dateStart)
-  if (!start || Number.isNaN(start.getTime())) return Number.POSITIVE_INFINITY
-  return start.getTime()
-}
-
-/** Zelfde logica als RaceCalendar: eerstvolgende race uit kalender. */
-function pickNextRaceCircuitId(races) {
-  if (!Array.isArray(races) || races.length === 0) return ''
-
-  const now = new Date()
-  const todayStart = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
-  ).getTime()
-
-  const upcoming = races
-    .filter((race) => getRaceStartTime(race) >= todayStart)
-    .sort((a, b) => getRaceStartTime(a) - getRaceStartTime(b))
-
-  for (const race of upcoming) {
-    const name = race?.circuitName || race?.meetingName || ''
-    if (!resolveCircuitCoords(name, race?.meetingName)) continue
-    return normalizeCircuitKey(name)
-  }
-  return ''
 }
 
 function formatClockFromIso(iso, utcOffsetSeconds = 0) {
@@ -221,8 +193,11 @@ function MetricBlock({
 
 export default function CircuitWeather() {
   const cachedCalendar = readCache(CACHE_KEY_RACE_CALENDAR)
+  const cachedDashboard = readCache(CACHE_KEY)
+  const cachedRaces = Array.isArray(cachedCalendar?.races) ? cachedCalendar.races : []
   const initialNextCircuitId = pickNextRaceCircuitId(
-    Array.isArray(cachedCalendar?.races) ? cachedCalendar.races : []
+    cachedRaces,
+    cachedDashboard?.nextRace
   )
 
   const [circuitOptions, setCircuitOptions] = useState([])
@@ -271,11 +246,11 @@ export default function CircuitWeather() {
         const options = [...unique.values()]
         if (!options.length) throw new Error('Geen circuits gevonden via racekalender.')
 
-        const nextRaceId = pickNextRaceCircuitId(races)
-        const defaultId =
-          nextRaceId && options.some((c) => c.id === nextRaceId)
-            ? nextRaceId
-            : options[0].id
+        const defaultId = resolveDefaultCircuitIdFromOptions(
+          races,
+          options,
+          readCache(CACHE_KEY)?.nextRace
+        )
 
         setCircuitOptions(options)
         setSelectedCircuit(defaultId)
@@ -289,8 +264,13 @@ export default function CircuitWeather() {
           lon: c.lon,
           dateStart: null,
         }))
+        const dashboardId = circuitIdFromRace(readCache(CACHE_KEY)?.nextRace)
+        const defaultId =
+          dashboardId && fallback.some((circuit) => circuit.id === dashboardId)
+            ? dashboardId
+            : fallback[0]?.id || ''
         setCircuitOptions(fallback)
-        setSelectedCircuit(fallback[0]?.id || '')
+        setSelectedCircuit(defaultId)
       }
     }
 

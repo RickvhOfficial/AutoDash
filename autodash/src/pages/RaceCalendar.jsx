@@ -12,34 +12,21 @@ import {
   SNAPSHOT_STARTUP_MAX_ATTEMPTS,
   SNAPSHOT_STARTUP_RETRY_BASE_MS,
 } from '../constants/uiTiming'
-import { CACHE_KEY_RACE_CALENDAR, readCache, writeCache } from '../services/cacheService'
+import { CACHE_KEY, CACHE_KEY_RACE_CALENDAR, readCache, writeCache } from '../services/cacheService'
 import { getCountryFlag, getCountryInfo } from '../services/countriesService'
 import { getRaceCalendar } from '../services/f1Service'
 import { heroOverlay, pageShell, borderSubtle, tableWrap, tableHeaderLg, tableBody, tableRow, raceNextRow, raceNextRowBadge, panel, secondaryButton, textOnPhoto, textFaint, cardText, cardTextMuted, cardTextSoft, fillRowOpen, statusUpcomingBadge } from '../utils/themeClasses'
+import {
+  formatDateRange,
+  getDisplayStatus,
+  getRaceKey,
+  pickNextRaceFromSources,
+} from '../utils/nextRace'
 
 // Zelfde hero-hoogte als Home voor consistente top-layout tussen routes.
 const raceHeroImage = '/RaceKalender.jpg'
 /** Zelfde interval als dashboard (`useDashboardData`): periodiek serverdata verversen. */
 const PAGE_DATA_POLL_MS = 30000
-
-// Parse alleen de datumcomponent (zonder lokale tijdverschuivingen).
-function parseDateOnly(isoDateString) {
-  if (!isoDateString || typeof isoDateString !== 'string') return null
-  const datePart = isoDateString.split('T')[0]
-  if (!datePart) return null
-  return new Date(`${datePart}T00:00:00Z`)
-}
-
-// Bouw nette "van/tot" datumweergave voor raceweekenden.
-function formatDateRange(dateStart, dateEnd) {
-  const start = parseDateOnly(dateStart)
-  const end = parseDateOnly(dateEnd || dateStart)
-  if (!start || !end || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
-    return 'Datum onbekend'
-  }
-  const dateOptions = { day: '2-digit', month: 'short', year: 'numeric' }
-  return `${start.toLocaleDateString('nl-NL', dateOptions)} t/m ${end.toLocaleDateString('nl-NL', dateOptions)}`
-}
 
 // Geeft status-badge styling terug; next race krijgt extra nadruk.
 function getStatusClass(status, isNextRace = false) {
@@ -53,24 +40,6 @@ function getStatusClass(status, isNextRace = false) {
     return 'inline-flex min-w-[6.5rem] items-center justify-center rounded-md border border-red-600 bg-red-600 px-3 py-1.5 text-sm font-semibold text-white ring-1 ring-red-500/30 dark:border-red-500/85 dark:bg-red-950/50 dark:text-red-100 dark:ring-red-500/30'
   }
   return `inline-flex min-w-[6.5rem] items-center justify-center rounded-md border px-3 py-1.5 text-sm font-semibold ${statusUpcomingBadge}`
-}
-
-// Hulpfunctie om races chronologisch te vergelijken.
-function getRaceStartTime(session) {
-  const start = parseDateOnly(session?.dateStart)
-  if (!start || Number.isNaN(start.getTime())) return Number.POSITIVE_INFINITY
-  return start.getTime()
-}
-
-function getRaceKey(session) {
-  return `${session?.sessionKey ?? session?.meetingName}-${session?.dateStart ?? ''}`
-}
-
-function getDisplayStatus(session, nextRaceKey) {
-  if (!session) return 'Aankomend'
-  if (session.status === 'Dit weekend') return 'Dit weekend'
-  if (session.status === 'Aankomend' && getRaceKey(session) === nextRaceKey) return 'Eerst Volgende'
-  return session.status || 'Aankomend'
 }
 
 const DESKTOP_ROW_GRID = 'grid-cols-[1.35fr_2.4fr_1.35fr_1fr_2rem]'
@@ -314,13 +283,10 @@ export default function RaceCalendar() {
     loadRaceCalendar(controller.signal)
   }
 
-  const now = new Date()
-  const todayStart = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
-  ).getTime()
-  const nextRace = races
-    .filter((session) => getRaceStartTime(session) >= todayStart)
-    .sort((a, b) => getRaceStartTime(a) - getRaceStartTime(b))[0]
+  const nextRace = pickNextRaceFromSources({
+    races,
+    dashboardNextRace: readCache(CACHE_KEY)?.nextRace,
+  })
   const nextRaceKey = nextRace ? getRaceKey(nextRace) : null
 
   return (
